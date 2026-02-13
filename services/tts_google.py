@@ -4,7 +4,7 @@ import json
 import os
 from dataclasses import dataclass
 
-from google.cloud import texttospeech
+from google.cloud import texttospeech_v1beta1 as texttospeech
 from google.oauth2 import service_account
 
 
