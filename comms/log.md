@@ -17,3 +17,4 @@
 [2026-02-12 23:54] [CLAUDE]: IMPL IN_PROGRESS: Task 01 foundation/auth/data implementation started (app factory, models, auth/admin routes, tests).
 [2026-02-12 23:57] [CLAUDE]: IMPL DONE: Completed Task 01 foundation/auth/data with app factory, SQLite models, login/logout, admin user management, create-admin CLI, and passing unit tests.
 [2026-02-13 00:01] [CLAUDE]: IMPL DONE: Completed Task 02 backend (SSML chunking, mark fallback mode, Google TTS wrapper, /api/tts/synthesize, temp audio cleanup caps, and tests).
+[2026-02-13 00:02] [ARCHITECT]: SPEC MAINTENANCE: Archived legacy task briefs to comms/tasks/archive/legacy; detailed dated specs remain the active implementation source.

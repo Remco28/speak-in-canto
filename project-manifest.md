@@ -19,9 +19,7 @@ This manifest is the single source of truth for the project's architecture, docu
 - [Task 01 (Detailed)](comms/tasks/2026-02-13-01-foundation-auth-and-data.md) - Foundation, Auth, Usage Data.
 - [Task 02 (Detailed)](comms/tasks/2026-02-13-02-tts-pipeline-and-sync-metadata.md) - TTS Pipeline and Sync Metadata.
 - [Task 03 (Detailed)](comms/tasks/2026-02-13-03-reader-ui-admin-usage-dashboard.md) - Reader UI and Admin Dashboard.
-- [Task 01 (Legacy Brief)](comms/tasks/01-data-model.md)
-- [Task 02 (Legacy Brief)](comms/tasks/02-tts-engine.md)
-- [Task 03 (Legacy Brief)](comms/tasks/03-frontend-ui.md)
+- [Legacy Task Briefs (Archived)](comms/tasks/archive/legacy/) - Superseded by detailed specs.
 
 ### Source Code
 - `app.py` - Flask app factory, auth, admin, and TTS route wiring.
