@@ -14,3 +14,6 @@
 [2026-02-12 22:35] [ARCHITECT]: SPEC READY: Added detailed implementation specs: 2026-02-13-01-foundation-auth-and-data.md, 2026-02-13-02-tts-pipeline-and-sync-metadata.md, 2026-02-13-03-reader-ui-admin-usage-dashboard.md.
 [2026-02-12 22:36] [ARCHITECT]: SPEC UPDATE: Added mark-density reliability policy, byte-based chunking limits, and fallback sync_mode contract in Task 02 + architecture/cost docs.
 [2026-02-12 22:37] [ARCHITECT]: SPEC UPDATE: Added Jyutping alignment safeguards, MAX_INPUT_CHARS=12000 guardrail, and strict temp-audio high-watermark cleanup caps (files/bytes + oldest-first eviction).
+[2026-02-12 23:54] [CLAUDE]: IMPL IN_PROGRESS: Task 01 foundation/auth/data implementation started (app factory, models, auth/admin routes, tests).
+[2026-02-12 23:57] [CLAUDE]: IMPL DONE: Completed Task 01 foundation/auth/data with app factory, SQLite models, login/logout, admin user management, create-admin CLI, and passing unit tests.
+[2026-02-13 00:01] [CLAUDE]: IMPL DONE: Completed Task 02 backend (SSML chunking, mark fallback mode, Google TTS wrapper, /api/tts/synthesize, temp audio cleanup caps, and tests).

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Speak-in-Canto</title>
+  </head>
+  <body>
+    <h1>Welcome, {{ user.username }}</h1>
+    <p>Reader home is ready for Task 03 implementation.</p>
+
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <button type="submit">Log Out</button>
+    </form>
+
+    {% if user.is_admin %}
+      <a href="{{ url_for('admin.users_list') }}">Manage users</a>
+    {% endif %}
+  </body>
+</html>
