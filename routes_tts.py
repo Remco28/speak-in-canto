@@ -54,7 +54,14 @@ def synthesize():
 
     try:
         if voice_mode == "high_quality":
-            synthesis = _synthesize_high_quality(builder, tts, tokens, voice_name)
+            synthesis = _synthesize_high_quality(
+                builder,
+                tts,
+                tokens,
+                voice_name,
+                target_max_bytes=int(current_app.config.get("HQ_TEXT_TARGET_MAX_BYTES", 350)),
+                hard_max_bytes=int(current_app.config.get("HQ_TEXT_HARD_MAX_BYTES", 700)),
+            )
         else:
             synthesis = _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate)
     except ValueError:
@@ -161,8 +168,8 @@ def _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate):
     }
 
 
-def _synthesize_high_quality(builder, tts, tokens, voice_name):
-    chunks = builder.build_text_chunks(tokens)
+def _synthesize_high_quality(builder, tts, tokens, voice_name, target_max_bytes=350, hard_max_bytes=700):
+    chunks = builder.build_text_chunks(tokens, target_max_bytes=target_max_bytes, hard_max_bytes=hard_max_bytes)
     all_audio: list[bytes] = []
     for chunk_text in chunks:
         chunk = tts.synthesize_text(chunk_text, voice_name)

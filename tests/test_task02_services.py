@@ -188,6 +188,17 @@ class Task02ServiceTests(unittest.TestCase):
             self.assertLessEqual(result["remaining_files"], 2)
             self.assertLessEqual(result["remaining_bytes"], 150)
 
+    def test_high_quality_text_chunking_splits_long_sentence_without_punctuation(self):
+        builder = SSMLBuilder()
+        # No sentence-ending punctuation; this should still split into safe HQ chunks.
+        text = "據" * 220
+        tokens = builder.build_tokens(text)
+        chunks = builder.build_text_chunks(tokens, target_max_bytes=350, hard_max_bytes=700)
+
+        self.assertGreater(len(chunks), 1)
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk.encode("utf-8")), 700)
+
 
 if __name__ == "__main__":
     unittest.main()

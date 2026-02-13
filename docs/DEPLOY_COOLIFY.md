@@ -5,11 +5,14 @@
 - Service type: Web app
 - Port: `8000` (container)
 - Health check path: `/healthz`
+- Process manager: Gunicorn (`app:app`)
 
 ## Required Environment Variables
 - `SECRET_KEY` (required; long random string)
 - `FLASK_ENV=production`
 - `DATABASE_PATH=/app/instance/speak_in_canto.db`
+- `GUNICORN_WORKERS=1` (recommended for low-memory VPS)
+- `GUNICORN_THREADS=2` (recommended for low-memory VPS)
 
 ### Google TTS Credentials
 Use one of these methods:
@@ -17,7 +20,7 @@ Use one of these methods:
 1. File path (if mounting a secret file):
 - `GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/gcp-sa.json`
 
-2. Inline JSON in env (recommended in Coolify):
+2. Inline JSON in env:
 - `GCP_SERVICE_ACCOUNT_JSON={...single-line-json...}`
 - Keep `private_key` newline escapes as `\\n`.
 
@@ -37,17 +40,19 @@ Use one of these methods:
 - `MONTHLY_QUOTA_CHARS=1000000`
 
 ## Persistent Storage
-Create a persistent volume and mount to:
+Create persistent volumes and mount to:
 - `/app/instance`
+- `/app/secrets` (when using file-based Google credentials)
 
 This preserves SQLite data across redeploys.
 
 ## First Deploy Checklist
 1. Add all required env vars in Coolify.
 2. Configure volume mount for `/app/instance`.
-3. Deploy.
-4. Verify app health endpoint: `/healthz` returns `{"status":"ok"}`.
-5. Create first admin user:
+3. If using file-based Google creds, mount `/app/secrets` and set `GOOGLE_APPLICATION_CREDENTIALS`.
+4. Deploy.
+5. Verify app health endpoint: `/healthz` returns `{"status":"ok"}`.
+6. Create first admin user:
    - Open terminal for the running container and run:
    - `flask create-admin --username <admin> --password '<strong-password>'`
 
