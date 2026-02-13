@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Speak-in-Canto Reader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reader.css') }}">
+  </head>
+  <body>
+    <main class="container">
+      <header class="topbar">
+        <h1>Speak-in-Canto</h1>
+        <div class="user-actions">
+          {% if user.is_admin %}
+            <a class="button" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a>
+          {% endif %}
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            <button type="submit">Log Out</button>
+          </form>
+        </div>
+      </header>
+
+      <section class="controls">
+        <label for="text-input">Cantonese Text</label>
+        <textarea id="text-input" rows="10" placeholder="Paste Cantonese text..."></textarea>
+        <div class="meta-row">
+          <p id="char-counter">0/{{ max_input_chars }}</p>
+          <p id="sync-mode-note" class="muted" hidden></p>
+        </div>
+
+        <div class="control-grid">
+          <label for="voice-select">Voice</label>
+          <select id="voice-select">
+            {% for voice in voices %}
+              <option value="{{ voice }}">{{ voice }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="speed-slider">Speed: <span id="speed-label">1.0x</span></label>
+          <input id="speed-slider" type="range" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+
+        <button id="read-btn" type="button">Read</button>
+        <p id="error-banner" class="error" hidden></p>
+      </section>
+
+      <section class="player">
+        <audio id="audio-player" controls preload="none"></audio>
+      </section>
+
+      <section>
+        <h2>Reader</h2>
+        <div id="token-view" class="token-view" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script>
+      window.READER_CONFIG = {
+        maxInputChars: {{ max_input_chars|tojson }},
+      };
+    </script>
+    <script src="{{ url_for('static', filename='js/reader.js') }}"></script>
+  </body>
+</html>

@@ -4,7 +4,7 @@ This manifest is the single source of truth for the project's architecture, docu
 
 ## Project Meta
 - **Name:** Speak-in-Canto (Cantonese TTS Reader)
-- **Status:** Tasks 01-02 Implemented / Task 03 Next
+- **Status:** Tasks 01-03 Implemented (MVP baseline complete)
 - **Objective:** Simple, secure web app for Cantonese Text-to-Speech using Google Cloud TTS.
 
 ## Key Pointers
@@ -25,8 +25,11 @@ This manifest is the single source of truth for the project's architecture, docu
 - `app.py` - Flask app factory, auth, admin, and TTS route wiring.
 - `models.py` - SQLite ORM models and usage logging utility.
 - `routes_tts.py` - TTS synthesis API contract and fallback flow.
+- `routes_admin_api.py` - Admin usage aggregation API endpoints.
 - `services/` - SSML builder, Google TTS wrapper, audio storage/cleanup.
-- `templates/` - Login, index, and admin user pages.
+- `templates/` - Login, reader, and admin dashboard pages.
+- `static/js/reader.js` - Reader sync/player frontend logic.
+- `static/css/reader.css` - Reader/admin UI styling.
 - `tests/` - Task 01 and Task 02 verification coverage.
 
 ## Current Focus
@@ -34,4 +37,4 @@ This manifest is the single source of truth for the project's architecture, docu
 - [x] Publish detailed implementation specs for Tasks 01-03.
 - [x] Implement Task 01 detailed spec (`2026-02-13-01-foundation-auth-and-data.md`).
 - [x] Implement Task 02 detailed spec (`2026-02-13-02-tts-pipeline-and-sync-metadata.md`).
-- [ ] Implement Task 03 detailed spec (`2026-02-13-03-reader-ui-admin-usage-dashboard.md`).
+- [x] Implement Task 03 detailed spec (`2026-02-13-03-reader-ui-admin-usage-dashboard.md`).

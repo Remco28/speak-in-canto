@@ -4,13 +4,13 @@ import os
 import tempfile
 import unittest
 
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import generate_password_hash
 
 from app import create_app
-from models import User, UsageLog, db, log_usage
+from models import UsageLog, User, db
 
 
-class Task01TestCase(unittest.TestCase):
+class Task03RouteTests(unittest.TestCase):
     def setUp(self) -> None:
         self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
         os.close(self.db_fd)
@@ -18,6 +18,8 @@ class Task01TestCase(unittest.TestCase):
         os.environ["FLASK_ENV"] = "development"
         os.environ["SECRET_KEY"] = "test-secret"
         os.environ["DATABASE_PATH"] = self.db_path
+        os.environ["MAX_INPUT_CHARS"] = "1234"
+        os.environ["MONTHLY_QUOTA_CHARS"] = "1000000"
 
         self.app = create_app()
         self.app.config["TESTING"] = True
@@ -26,7 +28,6 @@ class Task01TestCase(unittest.TestCase):
         with self.app.app_context():
             db.drop_all()
             db.create_all()
-
             admin = User(
                 username="admin",
                 password_hash=generate_password_hash("adminpass123"),
@@ -38,6 +39,14 @@ class Task01TestCase(unittest.TestCase):
                 is_admin=False,
             )
             db.session.add_all([admin, user])
+            db.session.commit()
+
+            db.session.add_all(
+                [
+                    UsageLog(user_id=1, char_count=100),
+                    UsageLog(user_id=1, char_count=250),
+                ]
+            )
             db.session.commit()
 
     def tearDown(self) -> None:
@@ -55,46 +64,34 @@ class Task01TestCase(unittest.TestCase):
             follow_redirects=True,
         )
 
-    def test_password_hash_verification(self) -> None:
-        raw = "secret123"
-        hashed = generate_password_hash(raw)
-        self.assertTrue(check_password_hash(hashed, raw))
-
-    def test_login_success_and_failure(self) -> None:
-        failure = self._login("user", "wrongpass")
-        self.assertEqual(failure.status_code, 200)
-        self.assertIn(b"Invalid username or password.", failure.data)
-
-        success = self._login("user", "userpass123")
-        self.assertEqual(success.status_code, 200)
-        self.assertIn(b"Speak-in-Canto", success.data)
-
-    def test_admin_route_protection_for_non_admin(self) -> None:
+    def test_reader_page_renders_counter_limit(self):
         self._login("user", "userpass123")
-        response = self.client.get("/admin/users")
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"1234", response.data)
+        self.assertIn(b"Speak-in-Canto", response.data)
+
+    def test_admin_usage_api_requires_admin(self):
+        self._login("user", "userpass123")
+        response = self.client.get("/api/admin/usage/monthly")
         self.assertEqual(response.status_code, 403)
 
-    def test_duplicate_username_handling(self) -> None:
+    def test_admin_usage_api_returns_aggregate(self):
         self._login("admin", "adminpass123")
-        response = self.client.post(
-            "/admin/users",
-            data={"username": "user", "password": "anotherpass123"},
-            follow_redirects=True,
-        )
+        response = self.client.get("/api/admin/usage/monthly")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Username already exists.", response.data)
 
-    def test_log_usage_inserts_row(self) -> None:
-        with self.app.app_context():
-            user = User.query.filter_by(username="user").first()
-            assert user is not None
+        data = response.get_json()
+        self.assertEqual(data["used_chars"], 350)
+        self.assertEqual(data["quota_chars"], 1000000)
+        self.assertGreaterEqual(data["percent_used"], 0)
+        self.assertIn("month_start", data)
+        self.assertIn("month_end", data)
 
-            log_usage(user_id=user.id, char_count=128, voice_name="yue-HK-Neural2-A")
-
-            row = UsageLog.query.filter_by(user_id=user.id).first()
-            self.assertIsNotNone(row)
-            self.assertEqual(row.char_count, 128)
-            self.assertEqual(row.voice_name, "yue-HK-Neural2-A")
+    def test_admin_dashboard_requires_admin(self):
+        self._login("user", "userpass123")
+        response = self.client.get("/admin/dashboard")
+        self.assertEqual(response.status_code, 403)
 
 
 if __name__ == "__main__":

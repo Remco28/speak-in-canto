@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reader.css') }}">
+  </head>
+  <body>
+    <main class="container">
+      <header class="topbar">
+        <h1>Admin Dashboard</h1>
+        <a class="button" href="{{ url_for('reader') }}">Back to Reader</a>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <ul>
+            {% for category, message in messages %}
+              <li data-category="{{ category }}">{{ message }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      <section class="usage-card">
+        <h2>Monthly Usage</h2>
+        <p><strong>{{ usage.used_chars }}</strong> / {{ usage.quota_chars }} characters</p>
+        <div class="progress-wrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ usage.percent_used }}">
+          <div class="progress-bar" style="width: {{ usage.percent_used }}%"></div>
+        </div>
+        <p>{{ usage.percent_used }}%</p>
+      </section>
+
+      <section>
+        <h2>Create User</h2>
+        <form method="post" action="{{ url_for('admin.users_create') }}">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" required>
+
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required>
+
+          <label for="is_admin">Admin</label>
+          <input id="is_admin" name="is_admin" type="checkbox">
+
+          <button type="submit">Create User</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Users</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if users %}
+              {% for user in users %}
+                <tr>
+                  <td>{{ user.id }}</td>
+                  <td>{{ user.username }}</td>
+                  <td>{{ 'admin' if user.is_admin else 'user' }}</td>
+                  <td>{{ user.created_at }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="4">No users yet.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

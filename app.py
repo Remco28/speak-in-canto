@@ -12,7 +12,9 @@ from werkzeug.security import generate_password_hash
 from admin import admin_bp
 from auth import auth_bp
 from models import User, db
+from routes_admin_api import admin_api_bp
 from routes_tts import tts_bp
+from services.tts_google import GoogleTTSWrapper
 
 
 login_manager = LoginManager()
@@ -59,6 +61,7 @@ def create_app() -> Flask:
     app.config["MAX_TEMP_AUDIO_FILES"] = int(os.getenv("MAX_TEMP_AUDIO_FILES", "120"))
     app.config["MAX_TEMP_AUDIO_BYTES"] = int(os.getenv("MAX_TEMP_AUDIO_BYTES", str(300 * 1024 * 1024)))
     app.config["TTS_TIMEOUT_SECONDS"] = float(os.getenv("TTS_TIMEOUT_SECONDS", "20"))
+    app.config["MONTHLY_QUOTA_CHARS"] = int(os.getenv("MONTHLY_QUOTA_CHARS", "1000000"))
 
     sqlite_path = _build_sqlite_path(app)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_path}"
@@ -69,12 +72,28 @@ def create_app() -> Flask:
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(admin_api_bp)
     app.register_blueprint(tts_bp)
 
     @app.route("/")
     @login_required
     def index():
-        return render_template("index.html", user=current_user)
+        return render_template(
+            "reader.html",
+            user=current_user,
+            voices=sorted(GoogleTTSWrapper.ALLOWED_VOICES),
+            max_input_chars=app.config["MAX_INPUT_CHARS"],
+        )
+
+    @app.route("/reader")
+    @login_required
+    def reader():
+        return render_template(
+            "reader.html",
+            user=current_user,
+            voices=sorted(GoogleTTSWrapper.ALLOWED_VOICES),
+            max_input_chars=app.config["MAX_INPUT_CHARS"],
+        )
 
     @app.route("/healthz")
     def healthz():
