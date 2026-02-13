@@ -55,6 +55,8 @@ class GrokTranslationService:
             data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "speak-in-canto/1.0",
                 "Authorization": f"Bearer {self.api_key}",
             },
             method="POST",
@@ -71,6 +73,10 @@ class GrokTranslationService:
                 detail = detail_body[:300]
             except Exception:
                 detail = str(exc)
+            if exc.code == 403 and "1010" in detail:
+                raise TranslationServiceError(
+                    "Forbidden by upstream edge (403/1010). Check API key permissions/team access and network egress."
+                ) from exc
             raise TranslationServiceError(f"Upstream error {exc.code}: {detail}") from exc
         except (socket.timeout, TimeoutError) as exc:
             raise TranslationTimeoutError("Translation request timed out.") from exc

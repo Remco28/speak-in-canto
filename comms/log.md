@@ -24,3 +24,4 @@
 [2026-02-13 00:51] [CLAUDE]: IMPL DONE: Added admin user deletion safeguards, per-user voice pin APIs/UI (pins at top), and smoother reader sync loop/click behavior.
 [2026-02-13 04:42] [ARCHITECT]: SPEC READY: Added Task 07 spec `2026-02-13-07-english-translation-grok.md` for Grok-only English translation panel under Reader; updated architecture doc with translation integration point and `GROK_API_KEY` runtime secret.
 [2026-02-13 04:53] [CLAUDE]: IMPL DONE: Implemented Task 07 Grok-only English translation (`/api/translate`), reader translation panel/UI states, env-driven Grok config, and translation route tests (full suite passing).
+[2026-02-13 05:15] [CLAUDE]: IMPL DONE: Added Coolify deployment readiness assets (`Dockerfile`, `.dockerignore`, `docs/DEPLOY_COOLIFY.md`), switched production runtime to Gunicorn dependency, and improved Grok 403/1010 diagnostics.
