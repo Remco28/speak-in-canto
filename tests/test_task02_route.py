@@ -27,7 +27,7 @@ class FakeTTSValid:
         pass
 
     def validate_voice(self, voice_name):
-        return voice_name == "yue-HK-Neural2-A"
+        return voice_name == "yue-HK-Standard-A"
 
 
 class Task02RouteTests(unittest.TestCase):
@@ -83,7 +83,7 @@ class Task02RouteTests(unittest.TestCase):
     def test_input_limit_enforced(self):
         response = self.client.post(
             "/api/tts/synthesize",
-            json={"text": "你" * 30, "voice_name": "yue-HK-Neural2-A", "speaking_rate": 1.0},
+            json={"text": "你" * 30, "voice_name": "yue-HK-Standard-A", "speaking_rate": 1.0},
         )
         self.assertEqual(response.status_code, 413)
 
@@ -102,7 +102,7 @@ class Task02RouteTests(unittest.TestCase):
     def test_usage_log_only_on_success(self):
         ok = self.client.post(
             "/api/tts/synthesize",
-            json={"text": "你好", "voice_name": "yue-HK-Neural2-A", "speaking_rate": 1.0},
+            json={"text": "你好", "voice_name": "yue-HK-Standard-A", "speaking_rate": 1.0},
         )
         self.assertEqual(ok.status_code, 200)
 

@@ -78,7 +78,7 @@ class Task02ServiceTests(unittest.TestCase):
             ]
         )
 
-        result = _synthesize_with_fallback(builder, fake, tokens, "yue-HK-Neural2-A", 1.0)
+        result = _synthesize_with_fallback(builder, fake, tokens, "yue-HK-Standard-A", 1.0)
         self.assertEqual(result["sync_mode"], "reduced")
         self.assertGreaterEqual(len(result["timepoints"]), 3)
 
@@ -102,7 +102,7 @@ class Task02ServiceTests(unittest.TestCase):
             ]
         )
 
-        result = _synthesize_with_fallback(builder, fake, tokens, "yue-HK-Neural2-A", 1.0)
+        result = _synthesize_with_fallback(builder, fake, tokens, "yue-HK-Standard-A", 1.0)
         seconds = [point["seconds"] for point in result["timepoints"]]
         self.assertEqual(seconds, sorted(seconds))
 
@@ -118,7 +118,7 @@ class Task02ServiceTests(unittest.TestCase):
         )
 
         with self.assertRaises(TTSServiceError):
-            _synthesize_with_fallback(builder, fake, tokens, "yue-HK-Neural2-A", 1.0)
+            _synthesize_with_fallback(builder, fake, tokens, "yue-HK-Standard-A", 1.0)
 
     def test_cleanup_ttl_and_caps(self):
         with tempfile.TemporaryDirectory() as tmp:

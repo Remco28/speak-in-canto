@@ -4,6 +4,7 @@ import json
 import os
 from dataclasses import dataclass
 
+from google.api_core import exceptions as gexceptions
 from google.cloud import texttospeech_v1beta1 as texttospeech
 from google.oauth2 import service_account
 
@@ -19,11 +20,12 @@ class SynthesisChunk:
 
 
 class GoogleTTSWrapper:
+    DEFAULT_FALLBACK_VOICE = "yue-HK-Standard-A"
     ALLOWED_VOICES = {
-        "yue-HK-Neural2-A",
-        "yue-HK-Neural2-B",
-        "yue-HK-Neural2-C",
-        "yue-HK-Neural2-D",
+        "yue-HK-Standard-A",
+        "yue-HK-Standard-B",
+        "yue-HK-Standard-C",
+        "yue-HK-Standard-D",
     }
 
     def __init__(self, timeout_seconds: float = 20.0) -> None:
@@ -38,22 +40,33 @@ class GoogleTTSWrapper:
             raise TTSServiceError("Unsupported voice")
 
         input_text = texttospeech.SynthesisInput(ssml=ssml)
-        voice = texttospeech.VoiceSelectionParams(language_code="yue-HK", name=voice_name)
         audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
             speaking_rate=speaking_rate,
         )
 
+        def _request_for(voice: str):
+            return {
+                "input": input_text,
+                "voice": texttospeech.VoiceSelectionParams(language_code="yue-HK", name=voice),
+                "audio_config": audio_config,
+                "enable_time_pointing": [texttospeech.SynthesizeSpeechRequest.TimepointType.SSML_MARK],
+            }
+
         try:
             response = self._get_client().synthesize_speech(
-                request={
-                    "input": input_text,
-                    "voice": voice,
-                    "audio_config": audio_config,
-                    "enable_time_pointing": [texttospeech.SynthesizeSpeechRequest.TimepointType.SSML_MARK],
-                },
+                request=_request_for(voice_name),
                 timeout=self.timeout_seconds,
             )
+        except gexceptions.InvalidArgument as exc:
+            # Some regions/projects do not expose every documented voice. Retry once with fallback.
+            if voice_name != self.DEFAULT_FALLBACK_VOICE and "does not exist" in str(exc).lower():
+                response = self._get_client().synthesize_speech(
+                    request=_request_for(self.DEFAULT_FALLBACK_VOICE),
+                    timeout=self.timeout_seconds,
+                )
+            else:
+                raise TTSServiceError(str(exc)) from exc
         except Exception as exc:  # pragma: no cover - external SDK behavior
             raise TTSServiceError(str(exc)) from exc
 

@@ -89,12 +89,12 @@ class Task01TestCase(unittest.TestCase):
             user = User.query.filter_by(username="user").first()
             assert user is not None
 
-            log_usage(user_id=user.id, char_count=128, voice_name="yue-HK-Neural2-A")
+            log_usage(user_id=user.id, char_count=128, voice_name="yue-HK-Standard-A")
 
             row = UsageLog.query.filter_by(user_id=user.id).first()
             self.assertIsNotNone(row)
             self.assertEqual(row.char_count, 128)
-            self.assertEqual(row.voice_name, "yue-HK-Neural2-A")
+            self.assertEqual(row.voice_name, "yue-HK-Standard-A")
 
 
 if __name__ == "__main__":
