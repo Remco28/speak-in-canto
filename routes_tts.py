@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
@@ -10,6 +12,13 @@ from services.tts_google import GoogleTTSWrapper, TTSServiceError
 
 
 tts_bp = Blueprint("tts", __name__, url_prefix="/api/tts")
+
+
+@dataclass
+class HQSynthesisContext:
+    total_calls: int = 0
+    split_retries: int = 0
+    max_depth_seen: int = 0
 
 
 @tts_bp.route("/synthesize", methods=["POST"])
@@ -61,6 +70,8 @@ def synthesize():
                 voice_name,
                 target_max_bytes=int(current_app.config.get("HQ_TEXT_TARGET_MAX_BYTES", 350)),
                 hard_max_bytes=int(current_app.config.get("HQ_TEXT_HARD_MAX_BYTES", 700)),
+                max_split_depth=int(current_app.config.get("HQ_MAX_SPLIT_DEPTH", 8)),
+                max_tts_calls=int(current_app.config.get("HQ_MAX_TTS_CALLS", 128)),
             )
         else:
             synthesis = _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate)
@@ -82,6 +93,15 @@ def synthesize():
 
     non_whitespace_count = sum(1 for token in tokens if not token.char.isspace())
     log_usage(current_user.id, non_whitespace_count, voice_name=voice_name)
+
+    if voice_mode == "high_quality":
+        current_app.logger.info(
+            "HQ TTS metrics: init_chunks=%s total_calls=%s split_retries=%s max_depth=%s",
+            synthesis.get("hq_initial_chunks", 0),
+            synthesis.get("hq_total_calls", 0),
+            synthesis.get("hq_split_retries", 0),
+            synthesis.get("hq_max_depth", 0),
+        )
 
     response = {
         "audio_url": stored.url,
@@ -168,11 +188,29 @@ def _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate):
     }
 
 
-def _synthesize_high_quality(builder, tts, tokens, voice_name, target_max_bytes=350, hard_max_bytes=700):
+def _synthesize_high_quality(
+    builder,
+    tts,
+    tokens,
+    voice_name,
+    target_max_bytes=350,
+    hard_max_bytes=700,
+    max_split_depth=8,
+    max_tts_calls=128,
+):
     chunks = builder.build_text_chunks(tokens, target_max_bytes=target_max_bytes, hard_max_bytes=hard_max_bytes)
     all_audio: list[bytes] = []
+    context = HQSynthesisContext()
     for chunk_text in chunks:
-        chunk_audio = _synthesize_high_quality_chunk_with_retry(tts, chunk_text, voice_name)
+        chunk_audio = _synthesize_high_quality_chunk_with_retry(
+            tts,
+            chunk_text,
+            voice_name,
+            context=context,
+            depth=0,
+            max_split_depth=max_split_depth,
+            max_tts_calls=max_tts_calls,
+        )
         all_audio.extend(chunk_audio)
 
     return {
@@ -182,10 +220,29 @@ def _synthesize_high_quality(builder, tts, tokens, voice_name, target_max_bytes=
         "sync_mode": "none",
         "sync_supported": False,
         "duration_seconds": 0.0,
+        "hq_initial_chunks": len(chunks),
+        "hq_total_calls": context.total_calls,
+        "hq_split_retries": context.split_retries,
+        "hq_max_depth": context.max_depth_seen,
     }
 
 
-def _synthesize_high_quality_chunk_with_retry(tts, chunk_text: str, voice_name: str) -> list[bytes]:
+def _synthesize_high_quality_chunk_with_retry(
+    tts,
+    chunk_text: str,
+    voice_name: str,
+    context: HQSynthesisContext,
+    depth: int,
+    max_split_depth: int,
+    max_tts_calls: int,
+) -> list[bytes]:
+    if context.total_calls >= max_tts_calls:
+        raise TTSServiceError("High Quality synthesis exceeded retry call budget. Please shorten input.")
+    if depth > max_split_depth:
+        raise TTSServiceError("High Quality synthesis exceeded split depth. Please shorten input.")
+
+    context.max_depth_seen = max(context.max_depth_seen, depth)
+    context.total_calls += 1
     try:
         chunk = tts.synthesize_text(chunk_text, voice_name)
         return [chunk.audio_content]
@@ -202,8 +259,23 @@ def _synthesize_high_quality_chunk_with_retry(tts, chunk_text: str, voice_name: 
         if not left or not right:
             raise
 
-        return _synthesize_high_quality_chunk_with_retry(tts, left, voice_name) + _synthesize_high_quality_chunk_with_retry(
-            tts, right, voice_name
+        context.split_retries += 1
+        return _synthesize_high_quality_chunk_with_retry(
+            tts,
+            left,
+            voice_name,
+            context=context,
+            depth=depth + 1,
+            max_split_depth=max_split_depth,
+            max_tts_calls=max_tts_calls,
+        ) + _synthesize_high_quality_chunk_with_retry(
+            tts,
+            right,
+            voice_name,
+            context=context,
+            depth=depth + 1,
+            max_split_depth=max_split_depth,
+            max_tts_calls=max_tts_calls,
         )
 
 

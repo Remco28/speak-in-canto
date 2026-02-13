@@ -43,6 +43,44 @@ class Task02ServiceTests(unittest.TestCase):
         tokens = builder.build_tokens("據" * 120)
         result = _synthesize_high_quality(builder, FakeHQTTS(), tokens, "yue-HK-Chirp3-HD-Orus")
         self.assertGreater(len(result["audio_chunks"]), 1)
+        self.assertGreaterEqual(result["hq_total_calls"], 1)
+        self.assertGreaterEqual(result["hq_split_retries"], 1)
+
+    def test_high_quality_respects_split_depth_budget(self):
+        class FakeAlwaysTooLong:
+            def synthesize_text(self, _text, _voice_name):
+                raise TTSServiceError("400 This request contains sentences that are too long.")
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("據" * 120)
+        with self.assertRaises(TTSServiceError) as ctx:
+            _synthesize_high_quality(
+                builder,
+                FakeAlwaysTooLong(),
+                tokens,
+                "yue-HK-Chirp3-HD-Orus",
+                max_split_depth=2,
+                max_tts_calls=128,
+            )
+        self.assertIn("split depth", str(ctx.exception).lower())
+
+    def test_high_quality_respects_tts_call_budget(self):
+        class FakeAlwaysTooLong:
+            def synthesize_text(self, _text, _voice_name):
+                raise TTSServiceError("400 This request contains sentences that are too long.")
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("據" * 120)
+        with self.assertRaises(TTSServiceError) as ctx:
+            _synthesize_high_quality(
+                builder,
+                FakeAlwaysTooLong(),
+                tokens,
+                "yue-HK-Chirp3-HD-Orus",
+                max_split_depth=20,
+                max_tts_calls=5,
+            )
+        self.assertIn("call budget", str(ctx.exception).lower())
 
     def test_chunking_respects_hard_limit(self):
         builder = SSMLBuilder()

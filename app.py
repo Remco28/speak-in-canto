@@ -65,6 +65,8 @@ def create_app() -> Flask:
     app.config["TTS_TIMEOUT_SECONDS"] = float(os.getenv("TTS_TIMEOUT_SECONDS", "20"))
     app.config["HQ_TEXT_TARGET_MAX_BYTES"] = int(os.getenv("HQ_TEXT_TARGET_MAX_BYTES", "350"))
     app.config["HQ_TEXT_HARD_MAX_BYTES"] = int(os.getenv("HQ_TEXT_HARD_MAX_BYTES", "700"))
+    app.config["HQ_MAX_SPLIT_DEPTH"] = int(os.getenv("HQ_MAX_SPLIT_DEPTH", "8"))
+    app.config["HQ_MAX_TTS_CALLS"] = int(os.getenv("HQ_MAX_TTS_CALLS", "128"))
     app.config["GROK_API_KEY"] = os.getenv("GROK_API_KEY", "")
     app.config["GROK_MODEL"] = os.getenv("GROK_MODEL", "grok-4-1-fast-non-reasoning")
     app.config["GROK_BASE_URL"] = os.getenv("GROK_BASE_URL", "https://api.x.ai/v1")

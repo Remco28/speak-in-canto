@@ -27,3 +27,4 @@
 [2026-02-13 05:15] [CLAUDE]: IMPL DONE: Added Coolify deployment readiness assets (`Dockerfile`, `.dockerignore`, `docs/DEPLOY_COOLIFY.md`), switched production runtime to Gunicorn dependency, and improved Grok 403/1010 diagnostics.
 [2026-02-13 14:42] [ARCHITECT]: DOCS UPDATE: Refreshed architecture, deployment, and project-manifest docs to match implemented voice modes, translation endpoint, data model additions, Coolify runtime env guidance, and current task status (including Task 07).
 [2026-02-13 14:54] [CLAUDE]: IMPL DONE: Fixed High Quality TTS long-sentence failures by enforcing smaller HQ text chunk byte budgets (`HQ_TEXT_TARGET_MAX_BYTES` / `HQ_TEXT_HARD_MAX_BYTES`) and added regression test for punctuation-sparse input.
+[2026-02-13 15:23] [CLAUDE]: IMPL DONE: Hardened High Quality TTS for scale by adding bounded recursive split retries (`HQ_MAX_SPLIT_DEPTH`, `HQ_MAX_TTS_CALLS`) and per-request HQ synthesis metrics logging.
