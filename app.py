@@ -14,6 +14,7 @@ from auth import auth_bp
 from models import User, db
 from routes_admin_api import admin_api_bp
 from routes_tts import tts_bp
+from routes_user import user_bp
 from services.tts_google import GoogleTTSWrapper
 
 
@@ -73,6 +74,7 @@ def create_app() -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(admin_api_bp)
+    app.register_blueprint(user_bp)
     app.register_blueprint(tts_bp)
 
     @app.route("/")

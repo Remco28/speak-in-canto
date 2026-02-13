@@ -57,6 +57,7 @@
               <th>Username</th>
               <th>Role</th>
               <th>Created</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -67,11 +68,20 @@
                   <td>{{ user.username }}</td>
                   <td>{{ 'admin' if user.is_admin else 'user' }}</td>
                   <td>{{ user.created_at }}</td>
+                  <td>
+                    {% if user.id != current_user.id %}
+                      <form method="post" action="{{ url_for('admin.users_delete', user_id=user.id) }}" onsubmit="return confirm('Delete user {{ user.username }}?');">
+                        <button type="submit" class="button-secondary">Delete</button>
+                      </form>
+                    {% else %}
+                      <span class="muted">Current user</span>
+                    {% endif %}
+                  </td>
                 </tr>
               {% endfor %}
             {% else %}
               <tr>
-                <td colspan="4">No users yet.</td>
+                <td colspan="5">No users yet.</td>
               </tr>
             {% endif %}
           </tbody>

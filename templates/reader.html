@@ -43,7 +43,10 @@
 
           <div>
             <label for="voice-select">Voice</label>
-            <select id="voice-select"></select>
+            <div class="voice-dropdown">
+              <button id="voice-dropdown-btn" type="button" class="voice-dropdown-btn">Select voice</button>
+              <div id="voice-dropdown-menu" class="voice-dropdown-menu" hidden></div>
+            </div>
           </div>
 
           <label for="speed-slider">Speed: <span id="speed-label">1.0x</span></label>

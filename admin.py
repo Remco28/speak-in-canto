@@ -71,6 +71,30 @@ def dashboard():
     return render_template("admin_dashboard.html", users=users, usage=usage)
 
 
+@admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def users_delete(user_id: int):
+    user = db.session.get(User, user_id)
+    if user is None:
+        flash("User not found.", "error")
+        return redirect(url_for("admin.dashboard"))
+
+    if user.is_admin:
+        admin_count = User.query.filter_by(is_admin=True).count()
+        if admin_count <= 1:
+            flash("Cannot delete the last admin user.", "error")
+            return redirect(url_for("admin.dashboard"))
+
+    if user.id == current_user.id:
+        flash("You cannot delete your own account while logged in.", "error")
+        return redirect(url_for("admin.dashboard"))
+
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"User '{user.username}' deleted.", "success")
+    return redirect(url_for("admin.dashboard"))
+
+
 def _monthly_usage() -> dict[str, int | float]:
     now = datetime.now(UTC)
     month_start = datetime(now.year, now.month, 1, tzinfo=UTC)
