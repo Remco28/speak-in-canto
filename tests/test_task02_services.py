@@ -106,6 +106,52 @@ class Task02ServiceTests(unittest.TestCase):
         seconds = [point["seconds"] for point in result["timepoints"]]
         self.assertEqual(seconds, sorted(seconds))
 
+    def test_chunk_end_mark_used_for_offset(self):
+        class FakeBuild:
+            def __init__(self, token_ids):
+                self.ssml = "<speak>...</speak>"
+                self.mark_to_token = {f"c_{tid}": tid for tid in token_ids}
+                self.mark_count = len(token_ids)
+
+        class FakeBuilder:
+            def build_token_chunks(self, _tokens, mode="full"):
+                return [[0, 1], [2, 3]]
+
+            def build_ssml_for_chunk(self, chunk_tokens, mode="full"):
+                return FakeBuild(chunk_tokens)
+
+        builder = FakeBuilder()
+        tokens = [0, 1, 2, 3]
+        first_end_mark = "chunk_end_0"
+        second_end_mark = "chunk_end_1"
+
+        fake = FakeTTS(
+            [
+                {
+                    "audio": b"A",
+                    "timepoints": [
+                        {"mark_name": "c_0", "seconds": 0.2},
+                        {"mark_name": "c_1", "seconds": 0.4},
+                        {"mark_name": first_end_mark, "seconds": 1.0},
+                    ],
+                },
+                {
+                    "audio": b"B",
+                    "timepoints": [
+                        {"mark_name": "c_2", "seconds": 0.1},
+                        {"mark_name": "c_3", "seconds": 0.3},
+                        {"mark_name": second_end_mark, "seconds": 0.9},
+                    ],
+                },
+            ]
+        )
+
+        result = _synthesize_with_fallback(builder, fake, tokens, "yue-HK-Standard-A", 1.0)
+        merged = result["timepoints"]
+        # First point from second chunk should be offset by chunk end (1.0), not last char (0.4).
+        # That means we should observe a point at approximately 1.1.
+        self.assertTrue(any(abs(p["seconds"] - 1.1) < 1e-9 for p in merged))
+
     def test_fallback_failure_raises_error(self):
         builder = SSMLBuilder()
         tokens = builder.build_tokens("你好世界")

@@ -99,35 +99,48 @@ def _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate):
     mark_to_token: dict[str, int] = {}
     offset = 0.0
 
-    for chunk_tokens in chunks:
+    for chunk_index, chunk_tokens in enumerate(chunks):
+        end_mark = f"chunk_end_{chunk_index}"
+
         built_full = builder.build_ssml_for_chunk(chunk_tokens, mode="full")
-        full = tts.synthesize_ssml(built_full.ssml, voice_name, speaking_rate)
+        full = tts.synthesize_ssml(_inject_end_mark(built_full.ssml, end_mark), voice_name, speaking_rate)
+        full_user_points, full_end_seconds = _split_timepoints(full.timepoints, end_mark)
 
         active_build = built_full
         active_chunk = full
+        active_points = full_user_points
+        active_end_seconds = full_end_seconds
 
-        degraded = built_full.mark_count > 0 and len(full.timepoints) < max(1, int(built_full.mark_count * 0.6))
+        degraded = built_full.mark_count > 0 and len(full_user_points) < max(1, int(built_full.mark_count * 0.6))
         if degraded:
             built_reduced = builder.build_ssml_for_chunk(chunk_tokens, mode="reduced")
-            reduced = tts.synthesize_ssml(built_reduced.ssml, voice_name, speaking_rate)
-            if built_reduced.mark_count > 0 and len(reduced.timepoints) < max(1, int(built_reduced.mark_count * 0.6)):
+            reduced = tts.synthesize_ssml(_inject_end_mark(built_reduced.ssml, end_mark), voice_name, speaking_rate)
+            reduced_user_points, reduced_end_seconds = _split_timepoints(reduced.timepoints, end_mark)
+            if built_reduced.mark_count > 0 and len(reduced_user_points) < max(
+                1, int(built_reduced.mark_count * 0.6)
+            ):
                 raise TTSServiceError("Timepoints remained degraded in reduced mode")
 
             sync_mode = "reduced"
             active_build = built_reduced
             active_chunk = reduced
+            active_points = reduced_user_points
+            active_end_seconds = reduced_end_seconds
 
         all_audio.append(active_chunk.audio_content)
 
         # Merge timepoints with global offset.
         chunk_last = 0.0
-        for point in active_chunk.timepoints:
+        for point in active_points:
             seconds = float(point["seconds"]) + offset
             all_timepoints.append({"mark_name": point["mark_name"], "seconds": seconds})
             chunk_last = max(chunk_last, float(point["seconds"]))
 
         mark_to_token.update(active_build.mark_to_token)
-        offset += chunk_last
+        if active_end_seconds is not None:
+            offset += float(active_end_seconds)
+        else:
+            offset += chunk_last
 
     duration_seconds = all_timepoints[-1]["seconds"] if all_timepoints else 0.0
     return {
@@ -137,3 +150,19 @@ def _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate):
         "sync_mode": sync_mode,
         "duration_seconds": duration_seconds,
     }
+
+
+def _inject_end_mark(ssml: str, mark_name: str) -> str:
+    return ssml.replace("</speak>", f'<mark name="{mark_name}"/></speak>', 1)
+
+
+def _split_timepoints(points: list[dict[str, float]], end_mark: str) -> tuple[list[dict[str, float]], float | None]:
+    user_points: list[dict[str, float]] = []
+    end_seconds: float | None = None
+    for point in points:
+        name = point.get("mark_name")
+        if name == end_mark:
+            end_seconds = float(point.get("seconds", 0.0))
+        else:
+            user_points.append(point)
+    return user_points, end_seconds

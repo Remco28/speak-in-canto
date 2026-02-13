@@ -85,6 +85,11 @@ button,
   cursor: pointer;
 }
 
+.button-secondary {
+  background: #fff;
+  color: var(--accent);
+}
+
 button[disabled] {
   opacity: 0.65;
   cursor: not-allowed;
@@ -135,6 +140,12 @@ button[disabled] {
 
 .token.active {
   background: var(--accent-soft);
+}
+
+.inline-player-controls {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
 }
 
 table {

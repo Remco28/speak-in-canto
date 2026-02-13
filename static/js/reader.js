@@ -12,11 +12,15 @@
   const tokenView = document.getElementById("token-view");
   const audio = document.getElementById("audio-player");
   const syncModeNote = document.getElementById("sync-mode-note");
+  const inlinePlayBtn = document.getElementById("inline-play-btn");
+  const inlinePauseBtn = document.getElementById("inline-pause-btn");
 
   let tokenToTime = new Map();
   let timeEntries = [];
   let maxTokenId = 0;
   let activeToken = null;
+  const SEEK_EPSILON_SECONDS = 0.02;
+  const HIGHLIGHT_EPSILON_SECONDS = 0.03;
 
   function setError(msg) {
     if (!msg) {
@@ -109,7 +113,7 @@
         if (seekTime === null) {
           return;
         }
-        audio.currentTime = seekTime;
+        audio.currentTime = Math.max(0, seekTime + SEEK_EPSILON_SECONDS);
         setActiveToken(tokenId);
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === "function") {
@@ -241,9 +245,24 @@
   readBtn.addEventListener("click", synthesize);
 
   audio.addEventListener("timeupdate", function () {
-    const tokenId = getCurrentTokenByTime(audio.currentTime);
+    const tokenId = getCurrentTokenByTime(audio.currentTime + HIGHLIGHT_EPSILON_SECONDS);
     setActiveToken(tokenId);
   });
+
+  if (inlinePlayBtn) {
+    inlinePlayBtn.addEventListener("click", function () {
+      const p = audio.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {});
+      }
+    });
+  }
+
+  if (inlinePauseBtn) {
+    inlinePauseBtn.addEventListener("click", function () {
+      audio.pause();
+    });
+  }
 
   updateCounter();
 })();
