@@ -13,6 +13,7 @@ This manifest is the single source of truth for the project's architecture, docu
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System-wide technical specs.
 - [COST_CONSTRAINTS.md](docs/COST_CONSTRAINTS.md) - Critical billing and payload limits.
 - [DEPLOY_COOLIFY.md](docs/DEPLOY_COOLIFY.md) - Deployment reference for container runtime on Coolify.
+- [ENVIRONMENT.md](docs/ENVIRONMENT.md) - Canonical runtime environment variable reference.
 - [TECHADVISOR.md](comms/roles/TECHADVISOR.md) - AI Technical Advisor role.
 
 ### Activity & Tasks

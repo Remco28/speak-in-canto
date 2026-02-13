@@ -63,3 +63,4 @@ This preserves SQLite data across redeploys.
 ## Notes
 - Audio files are temporary and written to `/app/static/temp_audio`, then cleaned up by TTL/cap logic.
 - If translation fails with `403/1010`, verify `GROK_API_KEY` in Coolify and redeploy so env changes are applied.
+- High Quality TTS may fail on provider sentence-length limits if text is effectively one long sentence. Keep HQ guardrail defaults (`HQ_TEXT_TARGET_MAX_BYTES`, `HQ_TEXT_HARD_MAX_BYTES`, `HQ_MAX_SPLIT_DEPTH`, `HQ_MAX_TTS_CALLS`) unless you have measured reasons to tune them.
