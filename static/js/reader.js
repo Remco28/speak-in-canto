@@ -14,6 +14,8 @@
   const syncModeNote = document.getElementById("sync-mode-note");
 
   let tokenToTime = new Map();
+  let timeEntries = [];
+  let maxTokenId = 0;
   let activeToken = null;
 
   function setError(msg) {
@@ -37,10 +39,12 @@
   }
 
   function getCurrentTokenByTime(currentTime) {
-    if (tokenToTime.size === 0) return null;
+    if (timeEntries.length === 0) return null;
 
     let found = null;
-    for (const [tokenId, ts] of tokenToTime.entries()) {
+    for (const entry of timeEntries) {
+      const tokenId = entry.tokenId;
+      const ts = entry.seconds;
       if (ts <= currentTime) {
         found = tokenId;
       } else {
@@ -67,6 +71,8 @@
   function renderTokens(tokens, markToToken) {
     tokenView.innerHTML = "";
     tokenToTime = new Map();
+    timeEntries = [];
+    maxTokenId = Math.max(0, (tokens || []).length - 1);
     activeToken = null;
 
     const markByToken = new Map();
@@ -99,10 +105,11 @@
 
       wrapper.addEventListener("click", function () {
         const tokenId = Number(wrapper.dataset.tokenId);
-        if (!tokenToTime.has(tokenId)) {
+        const seekTime = resolveSeekTime(tokenId);
+        if (seekTime === null) {
           return;
         }
-        audio.currentTime = tokenToTime.get(tokenId);
+        audio.currentTime = seekTime;
         setActiveToken(tokenId);
       });
 
@@ -122,8 +129,42 @@
       tokenToTime.set(Number(tokenId), Number(point.seconds));
     });
 
-    // Ensure deterministic traversal order by token id.
+    // Keep two indexes:
+    // 1) token-id based for click seeks
+    // 2) seconds-based for smooth timeupdate highlighting
     tokenToTime = new Map([...tokenToTime.entries()].sort((a, b) => a[0] - b[0]));
+    timeEntries = [...tokenToTime.entries()]
+      .map(([tokenId, seconds]) => ({ tokenId, seconds }))
+      .sort((a, b) => a.seconds - b.seconds);
+  }
+
+  function resolveSeekTime(tokenId) {
+    if (tokenToTime.size === 0) {
+      return null;
+    }
+    if (tokenToTime.has(tokenId)) {
+      return tokenToTime.get(tokenId);
+    }
+
+    // In reduced mode some tokens have no direct mark.
+    // Seek to nearest available timestamp for a stable UX.
+    let left = tokenId - 1;
+    while (left >= 0) {
+      if (tokenToTime.has(left)) {
+        return tokenToTime.get(left);
+      }
+      left -= 1;
+    }
+
+    let right = tokenId + 1;
+    while (right <= maxTokenId) {
+      if (tokenToTime.has(right)) {
+        return tokenToTime.get(right);
+      }
+      right += 1;
+    }
+
+    return null;
   }
 
   async function synthesize() {
