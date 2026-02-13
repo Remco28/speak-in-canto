@@ -1,6 +1,7 @@
 (function () {
   const config = window.READER_CONFIG || {};
   const maxInputChars = Number(config.maxInputChars || 12000);
+  const maxTranslationInputChars = Number(config.maxTranslationInputChars || 12000);
   const voiceCatalog = config.voices || { standard: [], high_quality: [] };
 
   const textInput = document.getElementById("text-input");
@@ -17,6 +18,10 @@
   const inlinePauseBtn = document.getElementById("inline-pause-btn");
   const voiceDropdownBtn = document.getElementById("voice-dropdown-btn");
   const voiceDropdownMenu = document.getElementById("voice-dropdown-menu");
+  const translateBtn = document.getElementById("translate-btn");
+  const translationStatus = document.getElementById("translation-status");
+  const translationError = document.getElementById("translation-error");
+  const translationOutput = document.getElementById("translation-output");
 
   let tokenToTime = new Map();
   let timeEntries = [];
@@ -50,6 +55,32 @@
   function setLoading(isLoading) {
     readBtn.disabled = isLoading;
     readBtn.textContent = isLoading ? "Reading..." : "Read";
+  }
+
+  function setTranslationLoading(isLoading) {
+    if (!translateBtn) return;
+    translateBtn.disabled = isLoading;
+    translateBtn.textContent = isLoading ? "Translating..." : "Translate to English";
+    if (translationStatus) {
+      translationStatus.hidden = !isLoading;
+      translationStatus.textContent = isLoading ? "Translating..." : "";
+    }
+  }
+
+  function setTranslationError(msg) {
+    if (!translationError) return;
+    if (!msg) {
+      translationError.hidden = true;
+      translationError.textContent = "";
+      return;
+    }
+    translationError.hidden = false;
+    translationError.textContent = msg;
+  }
+
+  function setTranslationOutput(text) {
+    if (!translationOutput) return;
+    translationOutput.textContent = text || "";
   }
 
   function getCurrentTokenByTime(currentTime) {
@@ -390,6 +421,39 @@
     }
   }
 
+  async function translateToEnglish() {
+    setTranslationError("");
+
+    const text = textInput.value;
+    if (!text.trim()) {
+      setTranslationError("Please enter text.");
+      return;
+    }
+    if (text.trim().length > maxTranslationInputChars) {
+      setTranslationError(`Text exceeds max length (${maxTranslationInputChars}).`);
+      return;
+    }
+
+    setTranslationLoading(true);
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setTranslationError(data.error || "Translation failed.");
+        return;
+      }
+      setTranslationOutput(data.translation || "");
+    } catch (_err) {
+      setTranslationError("Network or server error.");
+    } finally {
+      setTranslationLoading(false);
+    }
+  }
+
   function applyVoiceMode(mode) {
     if (mode === "high_quality" && (!voiceCatalog.high_quality || voiceCatalog.high_quality.length === 0)) {
       currentVoiceMode = "standard";
@@ -466,6 +530,9 @@
   });
 
   readBtn.addEventListener("click", synthesize);
+  if (translateBtn) {
+    translateBtn.addEventListener("click", translateToEnglish);
+  }
 
   audio.addEventListener("play", startSyncLoop);
   audio.addEventListener("pause", stopSyncLoop);

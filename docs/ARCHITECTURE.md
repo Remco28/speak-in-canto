@@ -9,6 +9,7 @@ A lightweight Cantonese TTS reader designed for family use. Key features include
 - **Database:** SQLite (Stored in a persistent volume)
 - **Frontend:** Vanilla JS / jQuery + Bootstrap 5 (Responsive)
 - **TTS Engine:** Google Cloud Text-to-Speech (Neural2-yue-HK)
+- **Translation Engine:** Grok API (English translation for reader text)
 
 ## 3. Data Model (SQLite)
 - `User`: id, username, password_hash, is_admin (bool).
@@ -33,5 +34,12 @@ A lightweight Cantonese TTS reader designed for family use. Key features include
 
 ## 6. Deployment (Coolify/VPS)
 - **Secrets:** Google Service Account JSON stored as an environment variable (`GOOGLE_APPLICATION_CREDENTIALS_JSON`).
+- **Additional Secrets:** Grok API key stored in environment (`GROK_API_KEY`).
 - **Persistence:** SQLite database file must be mapped to a persistent volume.
 - **HTTPS:** Managed by Coolify via Let's Encrypt.
+
+## 7. Translation Integration
+- **Route:** `POST /api/translate` (auth required).
+- **Purpose:** Translate reader input text to English for comprehension support.
+- **Flow:** Reader UI -> Flask translate route -> Grok API -> JSON translation response -> render below reader.
+- **Guardrails:** Input length cap + upstream timeout + controlled error responses.

@@ -69,11 +69,20 @@
           <button id="inline-pause-btn" type="button" class="button-secondary">Pause</button>
         </div>
       </section>
+
+      <section>
+        <h2>English Translation</h2>
+        <button id="translate-btn" type="button">Translate to English</button>
+        <p id="translation-status" class="muted" hidden></p>
+        <p id="translation-error" class="error" hidden></p>
+        <div id="translation-output" class="translation-output" aria-live="polite"></div>
+      </section>
     </main>
 
     <script>
       window.READER_CONFIG = {
         maxInputChars: {{ max_input_chars|tojson }},
+        maxTranslationInputChars: {{ max_translation_input_chars|tojson }},
         voices: {{ voice_catalog|tojson }},
       };
     </script>

@@ -13,6 +13,7 @@ from admin import admin_bp
 from auth import auth_bp
 from models import User, db
 from routes_admin_api import admin_api_bp
+from routes_translate import translate_bp
 from routes_tts import tts_bp
 from routes_user import user_bp
 from services.tts_google import GoogleTTSWrapper
@@ -62,6 +63,11 @@ def create_app() -> Flask:
     app.config["MAX_TEMP_AUDIO_FILES"] = int(os.getenv("MAX_TEMP_AUDIO_FILES", "120"))
     app.config["MAX_TEMP_AUDIO_BYTES"] = int(os.getenv("MAX_TEMP_AUDIO_BYTES", str(300 * 1024 * 1024)))
     app.config["TTS_TIMEOUT_SECONDS"] = float(os.getenv("TTS_TIMEOUT_SECONDS", "20"))
+    app.config["GROK_API_KEY"] = os.getenv("GROK_API_KEY", "")
+    app.config["GROK_MODEL"] = os.getenv("GROK_MODEL", "grok-4-1-fast-non-reasoning")
+    app.config["GROK_BASE_URL"] = os.getenv("GROK_BASE_URL", "https://api.x.ai/v1")
+    app.config["TRANSLATION_TIMEOUT_SECONDS"] = float(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "20"))
+    app.config["MAX_TRANSLATION_INPUT_CHARS"] = int(os.getenv("MAX_TRANSLATION_INPUT_CHARS", "12000"))
     app.config["MONTHLY_QUOTA_CHARS"] = int(os.getenv("MONTHLY_QUOTA_CHARS", "1000000"))
 
     sqlite_path = _build_sqlite_path(app)
@@ -76,6 +82,7 @@ def create_app() -> Flask:
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(tts_bp)
+    app.register_blueprint(translate_bp)
 
     @app.route("/")
     @login_required
@@ -86,6 +93,7 @@ def create_app() -> Flask:
             user=current_user,
             voice_catalog=voice_catalog,
             max_input_chars=app.config["MAX_INPUT_CHARS"],
+            max_translation_input_chars=app.config["MAX_TRANSLATION_INPUT_CHARS"],
         )
 
     @app.route("/reader")
@@ -97,6 +105,7 @@ def create_app() -> Flask:
             user=current_user,
             voice_catalog=voice_catalog,
             max_input_chars=app.config["MAX_INPUT_CHARS"],
+            max_translation_input_chars=app.config["MAX_TRANSLATION_INPUT_CHARS"],
         )
 
     @app.route("/healthz")

@@ -262,6 +262,16 @@ button[disabled] {
   gap: 8px;
 }
 
+.translation-output {
+  margin-top: 10px;
+  min-height: 80px;
+  white-space: pre-wrap;
+  border: 1px solid #d9e1e7;
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 10px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

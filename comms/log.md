@@ -22,3 +22,5 @@
 [2026-02-13 00:06] [CLAUDE]: IMPL DONE: Completed Task 03 with reader page, sync JS, admin dashboard, monthly usage API, and passing tests.
 [2026-02-13 00:40] [CLAUDE]: IMPL IN_PROGRESS: Added two-mode voice UX (Standard synced + High Quality Chirp no-sync), dynamic star-name voice list, and sync drift/click usability improvements.
 [2026-02-13 00:51] [CLAUDE]: IMPL DONE: Added admin user deletion safeguards, per-user voice pin APIs/UI (pins at top), and smoother reader sync loop/click behavior.
+[2026-02-13 04:42] [ARCHITECT]: SPEC READY: Added Task 07 spec `2026-02-13-07-english-translation-grok.md` for Grok-only English translation panel under Reader; updated architecture doc with translation integration point and `GROK_API_KEY` runtime secret.
+[2026-02-13 04:53] [CLAUDE]: IMPL DONE: Implemented Task 07 Grok-only English translation (`/api/translate`), reader translation panel/UI states, env-driven Grok config, and translation route tests (full suite passing).
