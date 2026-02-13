@@ -18,6 +18,7 @@
   const inlinePauseBtn = document.getElementById("inline-pause-btn");
   const voiceDropdownBtn = document.getElementById("voice-dropdown-btn");
   const voiceDropdownMenu = document.getElementById("voice-dropdown-menu");
+  const downloadBtn = document.getElementById("download-btn");
   const translateBtn = document.getElementById("translate-btn");
   const translationStatus = document.getElementById("translation-status");
   const translationError = document.getElementById("translation-error");
@@ -55,6 +56,31 @@
   function setLoading(isLoading) {
     readBtn.disabled = isLoading;
     readBtn.textContent = isLoading ? "Reading..." : "Read";
+  }
+
+  function setDownloadState(audioUrl, voiceLabel) {
+    if (!downloadBtn) return;
+    if (!audioUrl || !voiceLabel) {
+      downloadBtn.hidden = true;
+      downloadBtn.href = "#";
+      downloadBtn.setAttribute("aria-disabled", "true");
+      downloadBtn.textContent = "Download MP3";
+      downloadBtn.removeAttribute("download");
+      return;
+    }
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeVoice = String(voiceLabel)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "voice";
+
+    downloadBtn.hidden = false;
+    downloadBtn.href = audioUrl;
+    downloadBtn.setAttribute("aria-disabled", "false");
+    downloadBtn.setAttribute("download", `speak-in-canto-${safeVoice}-${stamp}.mp3`);
+    downloadBtn.textContent = `Download MP3 (${voiceLabel})`;
   }
 
   function setTranslationLoading(isLoading) {
@@ -228,6 +254,16 @@
     return mode === "high_quality" ? voiceCatalog.high_quality : voiceCatalog.standard;
   }
 
+  function getVoiceLabelById(mode, voiceId) {
+    const options = getModeOptions(mode);
+    const found = (options || []).find((voice) => {
+      const id = typeof voice === "string" ? voice : voice.id;
+      return id === voiceId;
+    });
+    if (!found) return voiceId;
+    return labelForVoice(found);
+  }
+
   function sortedOptionsWithPins(options) {
     const pinned = [];
     const unpinned = [];
@@ -363,6 +399,9 @@
       return;
     }
 
+    const requestVoiceId = selectedVoiceId;
+    const requestVoiceMode = currentVoiceMode;
+
     setLoading(true);
 
     try {
@@ -371,8 +410,8 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
-          voice_name: selectedVoiceId,
-          voice_mode: currentVoiceMode,
+          voice_name: requestVoiceId,
+          voice_mode: requestVoiceMode,
           speaking_rate: Number(speedSlider.value),
         }),
       });
@@ -386,16 +425,17 @@
       renderTokens(data.tokens || [], data.mark_to_token || {});
       buildTimeIndex(data.timepoints || [], data.mark_to_token || {});
       syncEnabled = Boolean(data.sync_supported);
+      setDownloadState(data.audio_url, getVoiceLabelById(requestVoiceMode, requestVoiceId));
 
       audio.src = data.audio_url;
-      if (currentVoiceMode === "high_quality") {
+      if (requestVoiceMode === "high_quality") {
         audio.playbackRate = 1.0;
       } else {
         audio.playbackRate = Number(speedSlider.value);
       }
       audio.currentTime = 0;
 
-      if (currentVoiceMode === "high_quality") {
+      if (requestVoiceMode === "high_quality") {
         syncModeNote.hidden = false;
         syncModeNote.textContent = "High Quality mode does not support character sync.";
       } else if (data.sync_mode === "reduced") {
@@ -584,6 +624,7 @@
 
   (async function init() {
     updateCounter();
+    setDownloadState("", "");
     await loadPins();
     applyVoiceMode("standard");
   })();
