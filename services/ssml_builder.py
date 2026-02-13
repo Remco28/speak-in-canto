@@ -104,6 +104,63 @@ class SSMLBuilder:
 
         return chunks
 
+    def build_text_chunks(
+        self,
+        tokens: list[Token],
+        target_max_bytes: int = 4200,
+        hard_max_bytes: int = 5000,
+    ) -> list[str]:
+        if not tokens:
+            return []
+
+        segments = self._split_segments(tokens)
+        chunks: list[str] = []
+        current: list[Token] = []
+
+        for segment in segments:
+            if not segment:
+                continue
+
+            candidate = current + segment
+            if self._text_size(candidate) <= target_max_bytes:
+                current = candidate
+                continue
+
+            if current:
+                chunks.append(self._tokens_to_text(current))
+                current = []
+
+            if self._text_size(segment) <= target_max_bytes:
+                current = segment
+                continue
+
+            for token in segment:
+                candidate = current + [token]
+                size = self._text_size(candidate)
+                if size <= target_max_bytes:
+                    current = candidate
+                    continue
+
+                if not current:
+                    if size > hard_max_bytes:
+                        raise ValueError("Token cannot fit into hard text byte limit")
+                    current = [token]
+                    continue
+
+                chunks.append(self._tokens_to_text(current))
+                current = [token]
+                if self._text_size(current) > hard_max_bytes:
+                    raise ValueError("Chunk cannot fit into hard text byte limit")
+
+        if current:
+            chunks.append(self._tokens_to_text(current))
+
+        for chunk in chunks:
+            if len(chunk.encode("utf-8")) > hard_max_bytes:
+                raise ValueError("Chunk cannot fit into hard text byte limit")
+
+        return chunks
+
     def build_ssml_for_chunk(self, tokens: Iterable[Token], mode: str) -> ChunkBuildResult:
         mark_to_token: dict[str, int] = {}
         parts: list[str] = ["<speak>"]
@@ -137,6 +194,12 @@ class SSMLBuilder:
     def _chunk_size(self, tokens: list[Token], mode: str) -> int:
         chunk = self.build_ssml_for_chunk(tokens, mode)
         return len(chunk.ssml.encode("utf-8"))
+
+    def _text_size(self, tokens: list[Token]) -> int:
+        return len(self._tokens_to_text(tokens).encode("utf-8"))
+
+    def _tokens_to_text(self, tokens: list[Token]) -> str:
+        return "".join(token.char for token in tokens)
 
     def _should_mark(self, token: Token, mode: str) -> bool:
         if token.char.isspace():

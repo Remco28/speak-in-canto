@@ -78,20 +78,22 @@ def create_app() -> Flask:
     @app.route("/")
     @login_required
     def index():
+        voice_catalog = GoogleTTSWrapper.get_voice_catalog()
         return render_template(
             "reader.html",
             user=current_user,
-            voices=sorted(GoogleTTSWrapper.ALLOWED_VOICES),
+            voice_catalog=voice_catalog,
             max_input_chars=app.config["MAX_INPUT_CHARS"],
         )
 
     @app.route("/reader")
     @login_required
     def reader():
+        voice_catalog = GoogleTTSWrapper.get_voice_catalog()
         return render_template(
             "reader.html",
             user=current_user,
-            voices=sorted(GoogleTTSWrapper.ALLOWED_VOICES),
+            voice_catalog=voice_catalog,
             max_input_chars=app.config["MAX_INPUT_CHARS"],
         )
 

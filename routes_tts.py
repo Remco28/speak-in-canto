@@ -18,6 +18,9 @@ def synthesize():
     payload = request.get_json(silent=True) or {}
     text = str(payload.get("text") or "")
     voice_name = str(payload.get("voice_name") or "")
+    voice_mode = str(payload.get("voice_mode") or "standard")
+    if voice_mode not in ("standard", "high_quality"):
+        return jsonify({"error": "Unsupported voice_mode"}), 400
     speaking_rate = payload.get("speaking_rate", 1.0)
 
     try:
@@ -37,7 +40,7 @@ def synthesize():
         return jsonify({"error": f"Input exceeds max length ({max_input_chars})."}), 413
 
     tts = GoogleTTSWrapper(timeout_seconds=float(current_app.config.get("TTS_TIMEOUT_SECONDS", 20.0)))
-    if not tts.validate_voice(voice_name):
+    if not tts.validate_voice(voice_name, voice_mode):
         return jsonify({"error": "Unsupported voice_name"}), 400
 
     store = AudioStore(current_app.config.get("TEMP_AUDIO_DIR", "static/temp_audio"))
@@ -50,7 +53,10 @@ def synthesize():
     tokens = builder.build_tokens(normalized)
 
     try:
-        synthesis = _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate)
+        if voice_mode == "high_quality":
+            synthesis = _synthesize_high_quality(builder, tts, tokens, voice_name)
+        else:
+            synthesis = _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate)
     except ValueError:
         return jsonify({"error": "Input cannot be chunked within SSML limits."}), 413
     except TTSServiceError as exc:
@@ -85,6 +91,8 @@ def synthesize():
         ],
         "mark_to_token": synthesis["mark_to_token"],
         "sync_mode": synthesis["sync_mode"],
+        "sync_supported": synthesis["sync_supported"],
+        "voice_mode": voice_mode,
         "jyutping_available": builder.jyutping_available,
     }
     return jsonify(response), 200
@@ -148,7 +156,25 @@ def _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate):
         "timepoints": all_timepoints,
         "mark_to_token": mark_to_token,
         "sync_mode": sync_mode,
+        "sync_supported": True,
         "duration_seconds": duration_seconds,
+    }
+
+
+def _synthesize_high_quality(builder, tts, tokens, voice_name):
+    chunks = builder.build_text_chunks(tokens)
+    all_audio: list[bytes] = []
+    for chunk_text in chunks:
+        chunk = tts.synthesize_text(chunk_text, voice_name)
+        all_audio.append(chunk.audio_content)
+
+    return {
+        "audio_chunks": all_audio,
+        "timepoints": [],
+        "mark_to_token": {},
+        "sync_mode": "none",
+        "sync_supported": False,
+        "duration_seconds": 0.0,
     }
 
 

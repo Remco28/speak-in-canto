@@ -20,3 +20,4 @@
 [2026-02-13 00:02] [ARCHITECT]: SPEC MAINTENANCE: Archived legacy task briefs to comms/tasks/archive/legacy; detailed dated specs remain the active implementation source.
 [2026-02-13 00:06] [CLAUDE]: IMPL IN_PROGRESS: Task 03 reader UI, sync player behavior, and admin usage dashboard/API implementation.
 [2026-02-13 00:06] [CLAUDE]: IMPL DONE: Completed Task 03 with reader page, sync JS, admin dashboard, monthly usage API, and passing tests.
+[2026-02-13 00:40] [CLAUDE]: IMPL IN_PROGRESS: Added two-mode voice UX (Standard synced + High Quality Chirp no-sync), dynamic star-name voice list, and sync drift/click usability improvements.

@@ -1,6 +1,7 @@
 (function () {
   const config = window.READER_CONFIG || {};
   const maxInputChars = Number(config.maxInputChars || 12000);
+  const voiceCatalog = config.voices || { standard: [], high_quality: [] };
 
   const textInput = document.getElementById("text-input");
   const charCounter = document.getElementById("char-counter");
@@ -12,6 +13,7 @@
   const tokenView = document.getElementById("token-view");
   const audio = document.getElementById("audio-player");
   const syncModeNote = document.getElementById("sync-mode-note");
+  const voiceModeToggle = document.getElementById("voice-mode-toggle");
   const inlinePlayBtn = document.getElementById("inline-play-btn");
   const inlinePauseBtn = document.getElementById("inline-pause-btn");
 
@@ -19,6 +21,8 @@
   let timeEntries = [];
   let maxTokenId = 0;
   let activeToken = null;
+  let syncEnabled = true;
+  let currentVoiceMode = "standard";
   const SEEK_EPSILON_SECONDS = 0.02;
   const HIGHLIGHT_EPSILON_SECONDS = 0.03;
 
@@ -108,6 +112,9 @@
       wrapper.appendChild(char);
 
       wrapper.addEventListener("click", function () {
+        if (!syncEnabled) {
+          return;
+        }
         const tokenId = Number(wrapper.dataset.tokenId);
         const seekTime = resolveSeekTime(tokenId);
         if (seekTime === null) {
@@ -195,6 +202,7 @@
         body: JSON.stringify({
           text,
           voice_name: voiceSelect.value,
+          voice_mode: currentVoiceMode,
           speaking_rate: Number(speedSlider.value),
         }),
       });
@@ -207,12 +215,20 @@
 
       renderTokens(data.tokens || [], data.mark_to_token || {});
       buildTimeIndex(data.timepoints || [], data.mark_to_token || {});
+      syncEnabled = Boolean(data.sync_supported);
 
       audio.src = data.audio_url;
-      audio.playbackRate = Number(speedSlider.value);
+      if (currentVoiceMode === "high_quality") {
+        audio.playbackRate = 1.0;
+      } else {
+        audio.playbackRate = Number(speedSlider.value);
+      }
       audio.currentTime = 0;
 
-      if (data.sync_mode === "reduced") {
+      if (currentVoiceMode === "high_quality") {
+        syncModeNote.hidden = false;
+        syncModeNote.textContent = "High Quality mode does not support character sync.";
+      } else if (data.sync_mode === "reduced") {
         syncModeNote.hidden = false;
         syncModeNote.textContent = "Reduced sync mode enabled for reliability.";
       } else {
@@ -245,6 +261,9 @@
   readBtn.addEventListener("click", synthesize);
 
   audio.addEventListener("timeupdate", function () {
+    if (!syncEnabled) {
+      return;
+    }
     const tokenId = getCurrentTokenByTime(audio.currentTime + HIGHLIGHT_EPSILON_SECONDS);
     setActiveToken(tokenId);
   });
@@ -265,4 +284,64 @@
   }
 
   updateCounter();
+
+  function repopulateVoiceSelect(mode) {
+    const options = mode === "high_quality" ? voiceCatalog.high_quality : voiceCatalog.standard;
+    voiceSelect.innerHTML = "";
+    (options || []).forEach((voice) => {
+      const opt = document.createElement("option");
+      if (typeof voice === "string") {
+        opt.value = voice;
+        opt.textContent = voice;
+      } else {
+        opt.value = voice.id;
+        opt.textContent = voice.label || voice.id;
+      }
+      voiceSelect.appendChild(opt);
+    });
+    if (!voiceSelect.value && voiceSelect.options.length > 0) {
+      voiceSelect.selectedIndex = 0;
+    }
+  }
+
+  function applyVoiceMode(mode) {
+    if (mode === "high_quality" && (!voiceCatalog.high_quality || voiceCatalog.high_quality.length === 0)) {
+      currentVoiceMode = "standard";
+      if (voiceModeToggle) {
+        voiceModeToggle.checked = false;
+      }
+      syncModeNote.hidden = false;
+      syncModeNote.textContent = "High Quality voices are unavailable in this project.";
+      repopulateVoiceSelect("standard");
+      speedSlider.disabled = false;
+      return;
+    }
+
+    currentVoiceMode = mode;
+    repopulateVoiceSelect(mode);
+
+    const isHighQuality = mode === "high_quality";
+    speedSlider.disabled = isHighQuality;
+    if (isHighQuality) {
+      speedLabel.textContent = "1.0x";
+      audio.playbackRate = 1.0;
+      syncEnabled = false;
+      setActiveToken(null);
+      syncModeNote.hidden = false;
+      syncModeNote.textContent = "High Quality mode does not support character sync.";
+    } else {
+      speedSlider.disabled = false;
+      syncEnabled = true;
+      syncModeNote.hidden = true;
+      syncModeNote.textContent = "";
+    }
+  }
+
+  if (voiceModeToggle) {
+    voiceModeToggle.addEventListener("change", function () {
+      applyVoiceMode(voiceModeToggle.checked ? "high_quality" : "standard");
+    });
+  }
+
+  applyVoiceMode("standard");
 })();

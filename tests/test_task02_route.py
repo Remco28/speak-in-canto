@@ -26,7 +26,9 @@ class FakeTTSValid:
     def __init__(self, *_args, **_kwargs):
         pass
 
-    def validate_voice(self, voice_name):
+    def validate_voice(self, voice_name, voice_mode):
+        if voice_mode not in ("standard", "high_quality"):
+            return False
         return voice_name == "yue-HK-Standard-A"
 
 
@@ -96,6 +98,7 @@ class Task02RouteTests(unittest.TestCase):
             "timepoints": [{"mark_name": "c_0", "seconds": 0.1}],
             "mark_to_token": {"c_0": 0},
             "sync_mode": "full",
+            "sync_supported": True,
             "duration_seconds": 0.1,
         },
     )

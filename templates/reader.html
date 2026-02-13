@@ -29,12 +29,22 @@
         </div>
 
         <div class="control-grid">
-          <label for="voice-select">Voice</label>
-          <select id="voice-select">
-            {% for voice in voices %}
-              <option value="{{ voice }}">{{ voice }}</option>
-            {% endfor %}
-          </select>
+          <div>
+            <label for="voice-mode-toggle">Voice Mode</label>
+            <div class="mode-toggle-row">
+              <span>Standard (Synced)</span>
+              <label class="switch">
+                <input id="voice-mode-toggle" type="checkbox" aria-label="Toggle high quality voice mode">
+                <span class="slider"></span>
+              </label>
+              <span>High Quality</span>
+            </div>
+          </div>
+
+          <div>
+            <label for="voice-select">Voice</label>
+            <select id="voice-select"></select>
+          </div>
 
           <label for="speed-slider">Speed: <span id="speed-label">1.0x</span></label>
           <input id="speed-slider" type="range" min="0.5" max="2.0" step="0.1" value="1.0">
@@ -61,6 +71,7 @@
     <script>
       window.READER_CONFIG = {
         maxInputChars: {{ max_input_chars|tojson }},
+        voices: {{ voice_catalog|tojson }},
       };
     </script>
     <script src="{{ url_for('static', filename='js/reader.js') }}"></script>
