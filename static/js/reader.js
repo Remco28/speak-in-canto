@@ -111,6 +111,10 @@
         }
         audio.currentTime = seekTime;
         setActiveToken(tokenId);
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch(() => {});
+        }
       });
 
       frag.appendChild(wrapper);
@@ -147,20 +151,17 @@
     }
 
     // In reduced mode some tokens have no direct mark.
-    // Seek to nearest available timestamp for a stable UX.
+    // Seek to nearest available marked token (left or right).
     let left = tokenId - 1;
-    while (left >= 0) {
-      if (tokenToTime.has(left)) {
+    let right = tokenId + 1;
+    while (left >= 0 || right <= maxTokenId) {
+      if (left >= 0 && tokenToTime.has(left)) {
         return tokenToTime.get(left);
       }
-      left -= 1;
-    }
-
-    let right = tokenId + 1;
-    while (right <= maxTokenId) {
-      if (tokenToTime.has(right)) {
+      if (right <= maxTokenId && tokenToTime.has(right)) {
         return tokenToTime.get(right);
       }
+      left -= 1;
       right += 1;
     }
 
@@ -213,6 +214,10 @@
       } else {
         syncModeNote.hidden = true;
         syncModeNote.textContent = "";
+      }
+      if (data.jyutping_available === false) {
+        syncModeNote.hidden = false;
+        syncModeNote.textContent = "Jyutping dependency unavailable on server; showing characters only.";
       }
 
       const playPromise = audio.play();

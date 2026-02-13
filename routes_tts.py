@@ -85,6 +85,7 @@ def synthesize():
         ],
         "mark_to_token": synthesis["mark_to_token"],
         "sync_mode": synthesis["sync_mode"],
+        "jyutping_available": builder.jyutping_available,
     }
     return jsonify(response), 200
 

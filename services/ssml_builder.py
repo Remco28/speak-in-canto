@@ -30,6 +30,10 @@ class ChunkBuildResult:
 
 
 class SSMLBuilder:
+    @property
+    def jyutping_available(self) -> bool:
+        return pc is not None
+
     def normalize_text(self, text: str) -> str:
         return text.replace("\r\n", "\n").replace("\r", "\n").strip()
 
