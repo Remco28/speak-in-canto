@@ -53,7 +53,10 @@ def synthesize():
         synthesis = _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate)
     except ValueError:
         return jsonify({"error": "Input cannot be chunked within SSML limits."}), 413
-    except TTSServiceError:
+    except TTSServiceError as exc:
+        current_app.logger.exception("TTS synthesis failed: %s", exc)
+        if current_app.debug or current_app.config.get("TESTING"):
+            return jsonify({"error": f"TTS synthesis failed: {exc}"}), 502
         return jsonify({"error": "TTS synthesis failed."}), 502
 
     merged_audio = b"".join(synthesis["audio_chunks"])
