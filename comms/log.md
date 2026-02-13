@@ -29,3 +29,4 @@
 [2026-02-13 14:54] [CLAUDE]: IMPL DONE: Fixed High Quality TTS long-sentence failures by enforcing smaller HQ text chunk byte budgets (`HQ_TEXT_TARGET_MAX_BYTES` / `HQ_TEXT_HARD_MAX_BYTES`) and added regression test for punctuation-sparse input.
 [2026-02-13 15:23] [CLAUDE]: IMPL DONE: Hardened High Quality TTS for scale by adding bounded recursive split retries (`HQ_MAX_SPLIT_DEPTH`, `HQ_MAX_TTS_CALLS`) and per-request HQ synthesis metrics logging.
 [2026-02-13 15:57] [ARCHITECT]: DOCS UPDATE: Added repo `README.md`, `docs/ENVIRONMENT.md`, and deployment note capturing HQ sentence-length failure lesson + required guardrail envs to prevent repeat regressions.
+[2026-02-13 17:11] [ARCHITECT]: DOCS CLEANUP: Removed obsolete reusable/legacy docs from repo and added `comms/VPS_SWAP_SETUP.md` with copy-friendly VPS swap setup instructions.
