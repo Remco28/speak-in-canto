@@ -172,8 +172,8 @@ def _synthesize_high_quality(builder, tts, tokens, voice_name, target_max_bytes=
     chunks = builder.build_text_chunks(tokens, target_max_bytes=target_max_bytes, hard_max_bytes=hard_max_bytes)
     all_audio: list[bytes] = []
     for chunk_text in chunks:
-        chunk = tts.synthesize_text(chunk_text, voice_name)
-        all_audio.append(chunk.audio_content)
+        chunk_audio = _synthesize_high_quality_chunk_with_retry(tts, chunk_text, voice_name)
+        all_audio.extend(chunk_audio)
 
     return {
         "audio_chunks": all_audio,
@@ -183,6 +183,52 @@ def _synthesize_high_quality(builder, tts, tokens, voice_name, target_max_bytes=
         "sync_supported": False,
         "duration_seconds": 0.0,
     }
+
+
+def _synthesize_high_quality_chunk_with_retry(tts, chunk_text: str, voice_name: str) -> list[bytes]:
+    try:
+        chunk = tts.synthesize_text(chunk_text, voice_name)
+        return [chunk.audio_content]
+    except TTSServiceError as exc:
+        if not _is_sentence_too_long_error(exc):
+            raise
+
+        split_index = _find_text_split_index(chunk_text)
+        if split_index is None:
+            raise
+
+        left = chunk_text[:split_index].strip()
+        right = chunk_text[split_index:].strip()
+        if not left or not right:
+            raise
+
+        return _synthesize_high_quality_chunk_with_retry(tts, left, voice_name) + _synthesize_high_quality_chunk_with_retry(
+            tts, right, voice_name
+        )
+
+
+def _is_sentence_too_long_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "sentences that are too long" in msg
+
+
+def _find_text_split_index(text: str) -> int | None:
+    if len(text) <= 1:
+        return None
+
+    midpoint = len(text) // 2
+    preferred_breaks = "。！？!?，,；;：:\n "
+    window = max(1, min(60, len(text) // 3))
+
+    for offset in range(window + 1):
+        right = midpoint + offset
+        if right < len(text) and text[right] in preferred_breaks:
+            return right + 1
+        left = midpoint - offset
+        if left > 0 and text[left] in preferred_breaks:
+            return left + 1
+
+    return midpoint
 
 
 def _inject_end_mark(ssml: str, mark_name: str) -> str:

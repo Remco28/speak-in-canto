@@ -7,7 +7,7 @@ from pathlib import Path
 
 from services.audio_store import AudioStore
 from services.ssml_builder import SSMLBuilder
-from routes_tts import _synthesize_with_fallback
+from routes_tts import _synthesize_high_quality, _synthesize_with_fallback
 from services.tts_google import TTSServiceError
 
 
@@ -32,6 +32,18 @@ class FakeTTS:
 
 
 class Task02ServiceTests(unittest.TestCase):
+    def test_high_quality_retries_by_splitting_when_sentence_too_long(self):
+        class FakeHQTTS:
+            def synthesize_text(self, text, _voice_name):
+                if len(text) > 50:
+                    raise TTSServiceError("400 This request contains sentences that are too long.")
+                return type("Chunk", (), {"audio_content": b"A", "timepoints": []})()
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("據" * 120)
+        result = _synthesize_high_quality(builder, FakeHQTTS(), tokens, "yue-HK-Chirp3-HD-Orus")
+        self.assertGreater(len(result["audio_chunks"]), 1)
+
     def test_chunking_respects_hard_limit(self):
         builder = SSMLBuilder()
         text = "你好。" * 300
