@@ -33,12 +33,29 @@ body {
 }
 
 .topbar h1 {
-  margin: 4px 0 8px;
-  color: #1d2a3a;
-  font-size: clamp(1.85rem, 2.8vw, 2.35rem);
-  letter-spacing: 0.14em;
-  font-family: "Avenir Next Condensed", "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
-  font-weight: 700;
+  margin: 6px 0 10px;
+}
+
+.brand-title {
+  color: #0d1014;
+  font-family: "Montserrat", "Trebuchet MS", "Segoe UI", sans-serif;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: clamp(8px, 1.2vw, 12px);
+  line-height: 1;
+}
+
+.brand-canto {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  font-size: clamp(2rem, 5vw, 4.2rem);
+}
+
+.brand-reader {
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  font-size: clamp(1.55rem, 3.1vw, 2.6rem);
+  transform: translateY(0.12em);
 }
 
 .controls,

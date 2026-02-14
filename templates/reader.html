@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Canto Reader</title>
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📖</text></svg>'>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reader.css') }}">
   </head>
   <body>
     <main class="container">
       <header class="topbar">
-        <h1>CANTO READER</h1>
+        <h1 class="brand-title"><span class="brand-canto">CANTO</span><span class="brand-reader">reader</span></h1>
       </header>
 
       <section class="controls">
