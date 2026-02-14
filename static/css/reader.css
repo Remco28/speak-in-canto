@@ -46,7 +46,7 @@ body {
 }
 
 .brand-canto {
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.07em;
   font-size: clamp(2rem, 5vw, 4.2rem);
 }
