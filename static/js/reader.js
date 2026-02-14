@@ -56,7 +56,7 @@
 
   function updateCounter() {
     const count = textInput.value.length;
-    charCounter.textContent = `${count}/${maxInputChars}`;
+    charCounter.textContent = `${count} / ${maxInputChars} characters`;
   }
 
   function setLoading(isLoading) {
