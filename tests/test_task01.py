@@ -67,7 +67,7 @@ class Task01TestCase(unittest.TestCase):
 
         success = self._login("user", "userpass123")
         self.assertEqual(success.status_code, 200)
-        self.assertIn(b"Speak-in-Canto", success.data)
+        self.assertIn(b"Canto Reader", success.data)
 
     def test_admin_route_protection_for_non_admin(self) -> None:
         self._login("user", "userpass123")

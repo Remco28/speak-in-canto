@@ -3,21 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Speak-in-Canto Reader</title>
+    <title>Canto Reader</title>
+    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📖</text></svg>'>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reader.css') }}">
   </head>
   <body>
     <main class="container">
       <header class="topbar">
-        <h1>Speak-in-Canto</h1>
-        <div class="user-actions">
-          {% if user.is_admin %}
-            <a class="button" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a>
-          {% endif %}
-          <form method="post" action="{{ url_for('auth.logout') }}">
-            <button type="submit">Log Out</button>
-          </form>
-        </div>
+        <h1>Canto Reader</h1>
       </header>
 
       <section class="controls">
@@ -64,19 +57,15 @@
         <p id="error-banner" class="error" hidden></p>
       </section>
 
-      <section class="player">
-        <audio id="audio-player" controls preload="none"></audio>
-        <div class="download-row">
-          <a id="download-btn" class="button button-secondary" href="#" hidden aria-disabled="true">Download MP3</a>
-        </div>
-      </section>
-
-      <section>
+      <section class="reader-section">
         <h2>Reader</h2>
         <div id="token-view" class="token-view" aria-live="polite"></div>
-        <div class="inline-player-controls">
-          <button id="inline-play-btn" type="button">Play</button>
-          <button id="inline-pause-btn" type="button" class="button-secondary">Pause</button>
+
+        <div class="player">
+          <audio id="audio-player" controls preload="none"></audio>
+          <div class="download-row">
+            <a id="download-btn" class="button button-secondary" href="#" hidden aria-disabled="true">Download MP3</a>
+          </div>
         </div>
       </section>
 
@@ -87,6 +76,15 @@
         <p id="translation-error" class="error" hidden></p>
         <div id="translation-output" class="translation-output" aria-live="polite"></div>
       </section>
+
+      <footer class="footer-links">
+        {% if user.is_admin %}
+          <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+        {% endif %}
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <button type="submit" class="text-link">Log out</button>
+        </form>
+      </footer>
     </main>
 
     <script>

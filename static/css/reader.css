@@ -28,14 +28,16 @@ body {
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 16px;
 }
 
-.user-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.topbar h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(2rem, 3vw, 2.6rem);
+  letter-spacing: 0.01em;
+  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  font-weight: 700;
 }
 
 .controls,
@@ -290,6 +292,13 @@ button[disabled] {
   margin-top: 10px;
 }
 
+.reader-section .player {
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .translation-output {
   margin-top: 10px;
   min-height: 80px;
@@ -298,6 +307,32 @@ button[disabled] {
   border-radius: 8px;
   background: #fbfdff;
   padding: 10px;
+}
+
+.footer-links {
+  margin-top: 18px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.footer-links a,
+.text-link {
+  color: var(--muted);
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
+
+.text-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.text-link:hover,
+.footer-links a:hover {
+  color: var(--ink);
 }
 
 table {

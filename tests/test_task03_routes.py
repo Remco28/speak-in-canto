@@ -69,7 +69,7 @@ class Task03RouteTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"1234", response.data)
-        self.assertIn(b"Speak-in-Canto", response.data)
+        self.assertIn(b"Canto Reader", response.data)
 
     def test_admin_usage_api_requires_admin(self):
         self._login("user", "userpass123")
