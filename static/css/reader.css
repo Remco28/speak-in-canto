@@ -215,6 +215,24 @@ button[disabled] {
   pointer-events: none;
 }
 
+.speed-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+}
+
+.speed-btn {
+  min-width: 40px;
+  padding: 6px 10px;
+}
+
+.speed-value {
+  min-width: 48px;
+  text-align: center;
+  font-weight: 700;
+}
+
 .meta-row {
   display: flex;
   justify-content: space-between;

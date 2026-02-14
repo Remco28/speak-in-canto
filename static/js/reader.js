@@ -6,8 +6,10 @@
 
   const textInput = document.getElementById("text-input");
   const charCounter = document.getElementById("char-counter");
-  const speedSlider = document.getElementById("speed-slider");
+  const speedDecreaseBtn = document.getElementById("speed-decrease-btn");
+  const speedIncreaseBtn = document.getElementById("speed-increase-btn");
   const speedLabel = document.getElementById("speed-label");
+  const speedNote = document.getElementById("speed-note");
   const readBtn = document.getElementById("read-btn");
   const errorBanner = document.getElementById("error-banner");
   const tokenView = document.getElementById("token-view");
@@ -34,9 +36,13 @@
   let selectedVoiceId = "";
   let voicePins = new Set();
   let animationHandle = null;
+  let currentSpeed = 1.0;
 
   const SEEK_EPSILON_SECONDS = 0.02;
   const HIGHLIGHT_EPSILON_SECONDS = 0.03;
+  const SPEED_MIN = 0.5;
+  const SPEED_MAX = 2.0;
+  const SPEED_STEP = 0.1;
 
   function setError(msg) {
     if (!msg) {
@@ -107,6 +113,16 @@
   function setTranslationOutput(text) {
     if (!translationOutput) return;
     translationOutput.textContent = text || "";
+  }
+
+  function setSpeed(value) {
+    const clamped = Math.max(SPEED_MIN, Math.min(SPEED_MAX, value));
+    const rounded = Math.round(clamped / SPEED_STEP) * SPEED_STEP;
+    currentSpeed = Number(rounded.toFixed(1));
+    speedLabel.textContent = `${currentSpeed.toFixed(1)}x`;
+    audio.playbackRate = currentSpeed;
+    if (speedDecreaseBtn) speedDecreaseBtn.disabled = currentSpeed <= SPEED_MIN;
+    if (speedIncreaseBtn) speedIncreaseBtn.disabled = currentSpeed >= SPEED_MAX;
   }
 
   function getCurrentTokenByTime(currentTime) {
@@ -412,7 +428,7 @@
           text,
           voice_name: requestVoiceId,
           voice_mode: requestVoiceMode,
-          speaking_rate: Number(speedSlider.value),
+          speaking_rate: currentSpeed,
         }),
       });
 
@@ -428,11 +444,7 @@
       setDownloadState(data.audio_url, getVoiceLabelById(requestVoiceMode, requestVoiceId));
 
       audio.src = data.audio_url;
-      if (requestVoiceMode === "high_quality") {
-        audio.playbackRate = 1.0;
-      } else {
-        audio.playbackRate = Number(speedSlider.value);
-      }
+      audio.playbackRate = currentSpeed;
       audio.currentTime = 0;
 
       if (requestVoiceMode === "high_quality") {
@@ -502,7 +514,7 @@
       }
       syncModeNote.hidden = false;
       syncModeNote.textContent = "High Quality voices are unavailable in this project.";
-      speedSlider.disabled = false;
+      if (speedNote) speedNote.hidden = true;
       return;
     }
 
@@ -522,19 +534,17 @@
     updateVoiceButtonLabel();
 
     const isHighQuality = mode === "high_quality";
-    speedSlider.disabled = isHighQuality;
     if (isHighQuality) {
-      speedLabel.textContent = "1.0x";
-      audio.playbackRate = 1.0;
       syncEnabled = false;
       setActiveToken(null);
       syncModeNote.hidden = false;
       syncModeNote.textContent = "High Quality mode does not support character sync.";
+      if (speedNote) speedNote.hidden = false;
     } else {
-      speedSlider.disabled = false;
       syncEnabled = true;
       syncModeNote.hidden = true;
       syncModeNote.textContent = "";
+      if (speedNote) speedNote.hidden = true;
     }
   }
 
@@ -563,11 +573,17 @@
   }
 
   textInput.addEventListener("input", updateCounter);
-  speedSlider.addEventListener("input", function () {
-    const speed = Number(speedSlider.value).toFixed(1);
-    speedLabel.textContent = `${speed}x`;
-    audio.playbackRate = Number(speedSlider.value);
-  });
+  if (speedDecreaseBtn) {
+    speedDecreaseBtn.addEventListener("click", function () {
+      setSpeed(currentSpeed - SPEED_STEP);
+    });
+  }
+
+  if (speedIncreaseBtn) {
+    speedIncreaseBtn.addEventListener("click", function () {
+      setSpeed(currentSpeed + SPEED_STEP);
+    });
+  }
 
   readBtn.addEventListener("click", synthesize);
   if (translateBtn) {
@@ -624,6 +640,7 @@
 
   (async function init() {
     updateCounter();
+    setSpeed(1.0);
     setDownloadState("", "");
     await loadPins();
     applyVoiceMode("standard");
