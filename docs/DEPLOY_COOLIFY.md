@@ -63,14 +63,18 @@ Create persistent volumes and mount to:
 - `/app/dictionaries` (if dictionary source files are mounted instead of committed)
 
 This preserves SQLite data across redeploys.
+Dictionary source files are intentionally ignored by Git and must be provided by mount/copy when dictionary mode is enabled.
 
 ## First Deploy Checklist
 1. Add all required env vars in Coolify.
 2. Configure volume mount for `/app/instance`.
 3. If using file-based Google creds, mount `/app/secrets` and set `GOOGLE_APPLICATION_CREDENTIALS`.
-4. Deploy.
-5. Verify app health endpoint: `/healthz` returns `{"status":"ok"}`.
-6. Create first admin user:
+4. If using dictionary mode, mount `/app/dictionaries` and place:
+   - `/app/dictionaries/cc-cedict.u8`
+   - `/app/dictionaries/cc-canto.u8`
+5. Deploy.
+6. Verify app health endpoint: `/healthz` returns `{"status":"ok"}`.
+7. Create first admin user:
    - Open terminal for the running container and run:
    - `flask create-admin --username <admin> --password '<strong-password>'`
 

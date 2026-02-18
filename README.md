@@ -59,6 +59,7 @@ Quick essentials:
 - Persistent storage:
   - `/app/instance` (SQLite)
   - `/app/secrets` (if using mounted Google credential file)
+  - `/app/dictionaries` (if using dictionary mode with mounted source files)
 - Set required env vars from:
   - `.env.example`
   - `docs/ENVIRONMENT.md`
