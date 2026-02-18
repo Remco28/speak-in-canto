@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from pathlib import Path
+from datetime import timedelta
 
 import click
 from flask import Flask, render_template
@@ -13,6 +14,7 @@ from admin import admin_bp
 from auth import auth_bp
 from models import User, db
 from routes_admin_api import admin_api_bp
+from routes_dictionary import dictionary_bp
 from routes_translate import translate_bp
 from routes_tts import tts_bp
 from routes_user import user_bp
@@ -35,6 +37,13 @@ def _build_sqlite_path(app: Flask) -> Path:
         path = Path(app.root_path) / path
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _enable_sqlite_pragmas(app: Flask) -> None:
@@ -73,6 +82,29 @@ def create_app() -> Flask:
     app.config["TRANSLATION_TIMEOUT_SECONDS"] = float(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "20"))
     app.config["MAX_TRANSLATION_INPUT_CHARS"] = int(os.getenv("MAX_TRANSLATION_INPUT_CHARS", "12000"))
     app.config["MONTHLY_QUOTA_CHARS"] = int(os.getenv("MONTHLY_QUOTA_CHARS", "1000000"))
+    app.config["SESSION_LIFETIME_HOURS"] = int(os.getenv("SESSION_LIFETIME_HOURS", "12"))
+    app.config["REMEMBER_COOKIE_DAYS"] = int(os.getenv("REMEMBER_COOKIE_DAYS", "30"))
+    app.config["SESSION_REFRESH_EACH_REQUEST"] = _env_bool("SESSION_REFRESH_EACH_REQUEST", True)
+    app.config["COOKIE_SECURE"] = _env_bool("COOKIE_SECURE", flask_env != "development")
+    app.config["COOKIE_SAMESITE"] = os.getenv("COOKIE_SAMESITE", "Lax")
+    app.config["DICTIONARY_ENABLED"] = _env_bool("DICTIONARY_ENABLED", True)
+    app.config["DICTIONARY_CC_CEDICT_PATH"] = os.getenv(
+        "DICTIONARY_CC_CEDICT_PATH", "data/dictionaries/cc-cedict.u8"
+    )
+    app.config["DICTIONARY_CC_CANTO_PATH"] = os.getenv(
+        "DICTIONARY_CC_CANTO_PATH", "data/dictionaries/cc-canto.u8"
+    )
+    app.config["MAX_DICTIONARY_INPUT_CHARS"] = int(os.getenv("MAX_DICTIONARY_INPUT_CHARS", "12000"))
+    app.config["MAX_DICTIONARY_ALTERNATIVES"] = int(os.getenv("MAX_DICTIONARY_ALTERNATIVES", "3"))
+    app.config["MAX_DICTIONARY_TERM_CHARS"] = int(os.getenv("MAX_DICTIONARY_TERM_CHARS", "64"))
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=app.config["SESSION_LIFETIME_HOURS"])
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=app.config["REMEMBER_COOKIE_DAYS"])
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SECURE"] = bool(app.config["COOKIE_SECURE"])
+    app.config["REMEMBER_COOKIE_SECURE"] = bool(app.config["COOKIE_SECURE"])
+    app.config["SESSION_COOKIE_SAMESITE"] = app.config["COOKIE_SAMESITE"]
+    app.config["REMEMBER_COOKIE_SAMESITE"] = app.config["COOKIE_SAMESITE"]
 
     sqlite_path = _build_sqlite_path(app)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_path}"
@@ -87,6 +119,7 @@ def create_app() -> Flask:
     app.register_blueprint(user_bp)
     app.register_blueprint(tts_bp)
     app.register_blueprint(translate_bp)
+    app.register_blueprint(dictionary_bp)
 
     @app.route("/")
     @login_required

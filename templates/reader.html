@@ -62,7 +62,24 @@
 
       <section class="reader-section">
         <h2>Reader</h2>
+        <div class="mode-toggle-row reader-mode-row">
+          <span>Read</span>
+          <label class="switch">
+            <input id="reader-mode-toggle" type="checkbox" aria-label="Toggle dictionary mode">
+            <span class="slider"></span>
+          </label>
+          <span>Dictionary</span>
+        </div>
         <div id="token-view" class="token-view" aria-live="polite"></div>
+        <div id="dictionary-popover" class="dictionary-popover" hidden>
+          <p id="dictionary-status" class="muted" hidden></p>
+          <p id="dictionary-term" class="dictionary-term"></p>
+          <ul id="dictionary-definitions" class="dictionary-definitions"></ul>
+          <details id="dictionary-alternatives-wrap" hidden>
+            <summary>Alternatives</summary>
+            <ul id="dictionary-alternatives" class="dictionary-alternatives"></ul>
+          </details>
+        </div>
 
         <div class="player">
           <audio id="audio-player" controls preload="none"></audio>

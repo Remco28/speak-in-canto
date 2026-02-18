@@ -15,6 +15,7 @@
   const tokenView = document.getElementById("token-view");
   const audio = document.getElementById("audio-player");
   const syncModeNote = document.getElementById("sync-mode-note");
+  const readerModeToggle = document.getElementById("reader-mode-toggle");
   const voiceModeToggle = document.getElementById("voice-mode-toggle");
   const inlinePlayBtn = document.getElementById("inline-play-btn");
   const inlinePauseBtn = document.getElementById("inline-pause-btn");
@@ -25,6 +26,12 @@
   const translationStatus = document.getElementById("translation-status");
   const translationError = document.getElementById("translation-error");
   const translationOutput = document.getElementById("translation-output");
+  const dictionaryPopover = document.getElementById("dictionary-popover");
+  const dictionaryStatus = document.getElementById("dictionary-status");
+  const dictionaryTerm = document.getElementById("dictionary-term");
+  const dictionaryDefinitions = document.getElementById("dictionary-definitions");
+  const dictionaryAlternativesWrap = document.getElementById("dictionary-alternatives-wrap");
+  const dictionaryAlternatives = document.getElementById("dictionary-alternatives");
 
   let tokenToTime = new Map();
   let timeEntries = [];
@@ -33,10 +40,14 @@
   let activeToken = null;
   let syncEnabled = true;
   let currentVoiceMode = "standard";
+  let currentReaderMode = "read";
   let selectedVoiceId = "";
   let voicePins = new Set();
   let animationHandle = null;
   let currentSpeed = 1.0;
+  let currentRenderedText = "";
+  let activeDictionarySpan = null;
+  let dictionaryAudio = null;
 
   const SEEK_EPSILON_SECONDS = 0.02;
   const HIGHLIGHT_EPSILON_SECONDS = 0.03;
@@ -115,6 +126,174 @@
     translationOutput.textContent = text || "";
   }
 
+  function clearDictionaryView() {
+    if (!dictionaryPopover) return;
+    dictionaryPopover.hidden = true;
+    dictionaryPopover.style.left = "0px";
+    dictionaryPopover.style.top = "0px";
+    if (dictionaryStatus) {
+      dictionaryStatus.hidden = true;
+      dictionaryStatus.textContent = "";
+    }
+    if (dictionaryTerm) {
+      dictionaryTerm.textContent = "";
+    }
+    if (dictionaryDefinitions) {
+      dictionaryDefinitions.innerHTML = "";
+    }
+    if (dictionaryAlternativesWrap) {
+      dictionaryAlternativesWrap.hidden = true;
+      dictionaryAlternativesWrap.open = false;
+    }
+    if (dictionaryAlternatives) {
+      dictionaryAlternatives.innerHTML = "";
+    }
+    activeDictionarySpan = null;
+    tokenView.querySelectorAll(".token.dictionary-hit").forEach((node) => node.classList.remove("dictionary-hit"));
+  }
+
+  function setDictionaryStatus(message) {
+    if (!dictionaryPopover || !dictionaryStatus) return;
+    dictionaryPopover.hidden = false;
+    dictionaryStatus.hidden = !message;
+    dictionaryStatus.textContent = message || "";
+  }
+
+  function placeDictionaryPopover(anchorEl) {
+    if (!dictionaryPopover || !anchorEl) return;
+    const rect = anchorEl.getBoundingClientRect();
+    const margin = 10;
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+
+    const desiredLeft = rect.left + margin;
+    const desiredTop = rect.bottom + margin;
+
+    dictionaryPopover.style.left = `${Math.max(margin, Math.min(desiredLeft, viewportW - dictionaryPopover.offsetWidth - margin))}px`;
+    dictionaryPopover.style.top = `${Math.max(margin, Math.min(desiredTop, viewportH - dictionaryPopover.offsetHeight - margin))}px`;
+  }
+
+  function renderDictionaryCandidate(candidate) {
+    if (!candidate) return;
+    if (dictionaryTerm) {
+      const source = candidate.source ? ` (${candidate.source})` : "";
+      const jyutping = candidate.jyutping ? ` · ${candidate.jyutping}` : "";
+      dictionaryTerm.textContent = `${candidate.term}${jyutping}${source}`;
+    }
+    if (dictionaryDefinitions) {
+      dictionaryDefinitions.innerHTML = "";
+      (candidate.definitions || []).forEach((definition) => {
+        const li = document.createElement("li");
+        li.textContent = definition;
+        dictionaryDefinitions.appendChild(li);
+      });
+    }
+  }
+
+  function renderDictionaryAlternatives(alternatives) {
+    if (!dictionaryAlternativesWrap || !dictionaryAlternatives) return;
+    dictionaryAlternatives.innerHTML = "";
+    if (!alternatives || alternatives.length === 0) {
+      dictionaryAlternativesWrap.hidden = true;
+      dictionaryAlternativesWrap.open = false;
+      return;
+    }
+    alternatives.forEach((candidate) => {
+      const li = document.createElement("li");
+      const defs = (candidate.definitions || []).join("; ");
+      li.textContent = `${candidate.term}: ${defs}`;
+      dictionaryAlternatives.appendChild(li);
+    });
+    dictionaryAlternativesWrap.hidden = false;
+  }
+
+  function highlightDictionarySpan(span) {
+    tokenView.querySelectorAll(".token.dictionary-hit").forEach((node) => node.classList.remove("dictionary-hit"));
+    if (!span) {
+      activeDictionarySpan = null;
+      return;
+    }
+    activeDictionarySpan = span;
+    for (let tokenId = span.start; tokenId < span.end; tokenId += 1) {
+      const node = tokenView.querySelector(`[data-token-id="${tokenId}"]`);
+      if (node) {
+        node.classList.add("dictionary-hit");
+      }
+    }
+  }
+
+  async function speakDictionaryTerm(term) {
+    if (!term || !selectedVoiceId) return;
+    try {
+      const response = await fetch("/api/dictionary/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: term,
+          voice_name: selectedVoiceId,
+          voice_mode: currentVoiceMode,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.audio_url) {
+        return;
+      }
+      if (!dictionaryAudio) {
+        dictionaryAudio = new Audio();
+      }
+      dictionaryAudio.src = data.audio_url;
+      dictionaryAudio.playbackRate = currentSpeed;
+      const p = dictionaryAudio.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {});
+      }
+    } catch (_err) {
+      // Best effort; lookup result already shown.
+    }
+  }
+
+  async function lookupDictionaryAtIndex(tokenId, anchorEl) {
+    if (!currentRenderedText) {
+      setDictionaryStatus("No rendered text to look up yet. Press Read first.");
+      placeDictionaryPopover(anchorEl);
+      return;
+    }
+    try {
+      setDictionaryStatus("Looking up...");
+      placeDictionaryPopover(anchorEl);
+      const response = await fetch("/api/dictionary/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: currentRenderedText, index: tokenId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setDictionaryStatus(data.error || "Dictionary lookup failed.");
+        placeDictionaryPopover(anchorEl);
+        return;
+      }
+
+      dictionaryPopover.hidden = false;
+      setDictionaryStatus("");
+      placeDictionaryPopover(anchorEl);
+      if (!data.best) {
+        if (dictionaryTerm) dictionaryTerm.textContent = "No definition found";
+        if (dictionaryDefinitions) dictionaryDefinitions.innerHTML = "";
+        renderDictionaryAlternatives([]);
+        highlightDictionarySpan(null);
+        return;
+      }
+
+      renderDictionaryCandidate(data.best);
+      renderDictionaryAlternatives(data.alternatives || []);
+      highlightDictionarySpan({ start: Number(data.best.start), end: Number(data.best.end) });
+      await speakDictionaryTerm(data.best.term);
+    } catch (_err) {
+      setDictionaryStatus("Network or server error.");
+      placeDictionaryPopover(anchorEl);
+    }
+  }
+
   function setSpeed(value) {
     const clamped = Math.max(SPEED_MIN, Math.min(SPEED_MAX, value));
     const rounded = Math.round(clamped / SPEED_STEP) * SPEED_STEP;
@@ -172,7 +351,9 @@
     timeEntries = [];
     timeEntrySeconds = [];
     maxTokenId = Math.max(0, (tokens || []).length - 1);
+    currentRenderedText = (tokens || []).map((token) => token.char || "").join("");
     activeToken = null;
+    clearDictionaryView();
 
     const markByToken = new Map();
     Object.entries(markToToken || {}).forEach(([mark, tokenId]) => {
@@ -203,10 +384,15 @@
       wrapper.appendChild(char);
 
       wrapper.addEventListener("click", function () {
+        const tokenId = Number(wrapper.dataset.tokenId);
+        if (currentReaderMode === "dictionary") {
+          lookupDictionaryAtIndex(tokenId, wrapper);
+          return;
+        }
+
         if (!syncEnabled) {
           return;
         }
-        const tokenId = Number(wrapper.dataset.tokenId);
         const seekTime = resolveSeekTime(tokenId);
         if (seekTime === null) {
           return;
@@ -548,6 +734,20 @@
     }
   }
 
+  function applyReaderMode(mode) {
+    currentReaderMode = mode === "dictionary" ? "dictionary" : "read";
+    if (readerModeToggle) {
+      readerModeToggle.checked = currentReaderMode === "dictionary";
+    }
+    if (currentReaderMode === "dictionary") {
+      setActiveToken(null);
+      stopSyncLoop();
+      setDictionaryStatus("Tap a word or phrase in Reader.");
+      return;
+    }
+    clearDictionaryView();
+  }
+
   function syncHighlightFrame() {
     if (syncEnabled && !audio.paused && !audio.ended) {
       const tokenId = getCurrentTokenByTime(audio.currentTime + HIGHLIGHT_EPSILON_SECONDS);
@@ -620,6 +820,12 @@
     });
   }
 
+  if (readerModeToggle) {
+    readerModeToggle.addEventListener("change", function () {
+      applyReaderMode(readerModeToggle.checked ? "dictionary" : "read");
+    });
+  }
+
   if (voiceDropdownBtn) {
     voiceDropdownBtn.addEventListener("click", function () {
       if (voiceDropdownMenu.hidden) {
@@ -636,6 +842,21 @@
     if (!within) {
       closeVoiceMenu();
     }
+
+    if (
+      dictionaryPopover &&
+      !dictionaryPopover.hidden &&
+      !dictionaryPopover.contains(event.target) &&
+      !tokenView.contains(event.target)
+    ) {
+      clearDictionaryView();
+    }
+  });
+
+  window.addEventListener("resize", function () {
+    if (dictionaryPopover && !dictionaryPopover.hidden) {
+      clearDictionaryView();
+    }
   });
 
   (async function init() {
@@ -644,5 +865,6 @@
     setDownloadState("", "");
     await loadPins();
     applyVoiceMode("standard");
+    applyReaderMode("read");
   })();
 })();

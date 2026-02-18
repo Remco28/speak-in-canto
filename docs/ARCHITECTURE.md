@@ -1,7 +1,7 @@
-# System Architecture: Speak-in-Canto
+# System Architecture: Canto Reader
 
 ## 1. Overview
-A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playback, character-level sync (Standard voices), and optional English translation via Grok.
+A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playback, character-level sync (Standard voices), local dictionary lookup, and optional English translation via Grok.
 
 ## 2. Tech Stack
 - **Language:** Python 3.x
@@ -12,6 +12,7 @@ A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playbac
   - Standard yue-HK voices with SSML marks + sync
   - Chirp3-HD yue-HK voices in high-quality mode (no SSML mark sync)
 - **Translation Engine:** Grok API (English translation for reader text)
+- **Dictionary Engine:** Local dictionary ingestion + phrase-first lookup (CC-CEDICT + CC-Canto)
 
 ## 3. Data Model (SQLite)
 - `User`: id, username, password_hash, is_admin (bool).
@@ -33,19 +34,51 @@ A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playbac
     - **Click-to-Seek:** Jump to the timestamp associated with a character span.
     - **Playback Speed:** Client-side `playbackRate` adjustment (0.5x to 2.0x) to ensure zero additional API costs.
 
-## 5. File Management & Storage
-- **Directory:** `static/temp_audio/`
-- **Retention:** Files are stored with a timestamped name.
-- **Cleanup:** A background task or scheduled function deletes files older than 4 hours.
+## 5. Dictionary Implementation (No-AI)
+- **Sources:** CC-CEDICT + CC-Canto local files.
+- **Core Services:**
+  - `services/dictionary_loader.py` parses dictionary entries into in-memory indexes.
+  - `services/dictionary_lookup.py` performs phrase-first, longest-match lookup at a clicked token index.
+- **API:**
+  - `POST /api/dictionary/lookup`
+    - Input: full rendered text + click index.
+    - Output: `best` candidate + ranked `alternatives`.
+  - `POST /api/dictionary/speak`
+    - Input: matched term + voice settings.
+    - Output: short audio URL for immediate playback.
+- **UI Behavior:**
+  - Reader has `Read` and `Dictionary` modes.
+  - Dictionary mode click opens a floating popover near clicked text.
+  - Popover shows best gloss + optional alternatives.
+  - Matched span is highlighted in Reader.
+  - Click auto-speaks the matched term.
+- **Term Audio Cache:**
+  - Persistent hash key cache by `(voice_mode, voice_name, text)`.
+  - Stored in `static/temp_audio/` using existing TTL/size/file cleanup guardrails.
 
-## 6. Deployment (Coolify/VPS)
+## 6. Auth & Session Strategy
+- Login supports `Remember me for 30 days`.
+- Session policy is env-driven:
+  - `SESSION_LIFETIME_HOURS`
+  - `REMEMBER_COOKIE_DAYS`
+  - `SESSION_REFRESH_EACH_REQUEST`
+  - `COOKIE_SECURE`
+  - `COOKIE_SAMESITE`
+- Redirect handling for `next` is restricted to local paths.
+
+## 7. File Management & Storage
+- **Directory:** `static/temp_audio/`
+- **Retention:** Files are stored as either unique synthesized output files or deterministic hash cache files.
+- **Cleanup:** Request-time cleanup enforces TTL + max file count + max bytes.
+
+## 8. Deployment (Coolify/VPS)
 - **Google Credentials:** Either mounted key file path via `GOOGLE_APPLICATION_CREDENTIALS`, or inline JSON via `GCP_SERVICE_ACCOUNT_JSON`.
 - **Additional Secrets:** Grok API key stored in environment (`GROK_API_KEY`).
 - **Persistence:** SQLite database file must be mapped to a persistent volume.
 - **HTTPS:** Managed by Coolify via Let's Encrypt.
 - **Runtime:** Gunicorn in container (`Dockerfile`), with low-memory defaults configurable via env.
 
-## 7. Translation Integration
+## 9. Translation Integration
 - **Route:** `POST /api/translate` (auth required).
 - **Purpose:** Translate reader input text to English for comprehension support.
 - **Flow:** Reader UI -> Flask translate route -> Grok API -> JSON translation response -> render below reader.

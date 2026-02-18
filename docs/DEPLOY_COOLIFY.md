@@ -13,6 +13,11 @@
 - `DATABASE_PATH=/app/instance/speak_in_canto.db`
 - `GUNICORN_WORKERS=1` (recommended for low-memory VPS)
 - `GUNICORN_THREADS=2` (recommended for low-memory VPS)
+- `SESSION_LIFETIME_HOURS=12`
+- `REMEMBER_COOKIE_DAYS=30`
+- `SESSION_REFRESH_EACH_REQUEST=true`
+- `COOKIE_SECURE=true`
+- `COOKIE_SAMESITE=Lax`
 
 ### Google TTS Credentials
 Use one of these methods:
@@ -43,10 +48,19 @@ Use one of these methods:
 - `HQ_MAX_TTS_CALLS=128`
 - `MONTHLY_QUOTA_CHARS=1000000`
 
+### Dictionary Mode (optional but required for dictionary feature)
+- `DICTIONARY_ENABLED=true`
+- `DICTIONARY_CC_CEDICT_PATH=/app/dictionaries/cc-cedict.u8`
+- `DICTIONARY_CC_CANTO_PATH=/app/dictionaries/cc-canto.u8`
+- `MAX_DICTIONARY_INPUT_CHARS=12000`
+- `MAX_DICTIONARY_ALTERNATIVES=3`
+- `MAX_DICTIONARY_TERM_CHARS=64`
+
 ## Persistent Storage
 Create persistent volumes and mount to:
 - `/app/instance`
 - `/app/secrets` (when using file-based Google credentials)
+- `/app/dictionaries` (if dictionary source files are mounted instead of committed)
 
 This preserves SQLite data across redeploys.
 

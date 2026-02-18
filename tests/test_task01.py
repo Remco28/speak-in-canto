@@ -69,6 +69,25 @@ class Task01TestCase(unittest.TestCase):
         self.assertEqual(success.status_code, 200)
         self.assertIn(b"Canto Reader", success.data)
 
+    def test_login_with_remember_me_sets_cookie(self) -> None:
+        response = self.client.post(
+            "/login",
+            data={"username": "user", "password": "userpass123", "remember_me": "1"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        cookies = response.headers.getlist("Set-Cookie")
+        self.assertTrue(any("remember_token=" in cookie for cookie in cookies))
+
+    def test_login_rejects_external_next_redirect(self) -> None:
+        response = self.client.post(
+            "/login?next=https://evil.example",
+            data={"username": "user", "password": "userpass123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/", response.location)
+
     def test_admin_route_protection_for_non_admin(self) -> None:
         self._login("user", "userpass123")
         response = self.client.get("/admin/users")
