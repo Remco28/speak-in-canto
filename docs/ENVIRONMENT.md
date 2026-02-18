@@ -12,6 +12,13 @@ This is the runtime environment variable reference for Speak-in-Canto.
   - SQLite file path.
   - Coolify recommended: `/app/instance/speak_in_canto.db`.
 
+## Auth & Session
+- `SESSION_LIFETIME_HOURS` (default `12`)
+- `REMEMBER_COOKIE_DAYS` (default `30`)
+- `SESSION_REFRESH_EACH_REQUEST` (default `true`)
+- `COOKIE_SECURE` (default `true` in production, `false` in development)
+- `COOKIE_SAMESITE` (default `Lax`)
+
 ## Gunicorn (Container Runtime)
 - `PORT`
   - Container listen port (default `8000` via `Dockerfile` command).
@@ -54,6 +61,14 @@ These prevent provider sentence-length failures from causing unbounded retry fan
 - `TRANSLATION_TIMEOUT_SECONDS` (default `20`)
 - `MAX_TRANSLATION_INPUT_CHARS` (default `12000`)
 
+## Dictionary Mode (Local, No-AI)
+- `DICTIONARY_ENABLED` (default `true`)
+- `DICTIONARY_CC_CEDICT_PATH` (default `data/dictionaries/cc-cedict.u8`)
+- `DICTIONARY_CC_CANTO_PATH` (default `data/dictionaries/cc-canto.u8`)
+- `MAX_DICTIONARY_INPUT_CHARS` (default `12000`)
+- `MAX_DICTIONARY_ALTERNATIVES` (default `3`)
+- `MAX_DICTIONARY_TERM_CHARS` (default `64`)
+
 ## Usage / Quota
 - `MONTHLY_QUOTA_CHARS` (default `1000000`)
 
@@ -61,6 +76,11 @@ These prevent provider sentence-length failures from causing unbounded retry fan
 ```env
 FLASK_ENV=production
 DATABASE_PATH=/app/instance/speak_in_canto.db
+SESSION_LIFETIME_HOURS=12
+REMEMBER_COOKIE_DAYS=30
+SESSION_REFRESH_EACH_REQUEST=true
+COOKIE_SECURE=true
+COOKIE_SAMESITE=Lax
 GUNICORN_WORKERS=1
 GUNICORN_THREADS=2
 GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/gcp-sa.json
@@ -68,6 +88,12 @@ GROK_MODEL=grok-4-1-fast-non-reasoning
 GROK_BASE_URL=https://api.x.ai/v1
 MAX_INPUT_CHARS=12000
 MAX_TRANSLATION_INPUT_CHARS=12000
+DICTIONARY_ENABLED=true
+DICTIONARY_CC_CEDICT_PATH=data/dictionaries/cc-cedict.u8
+DICTIONARY_CC_CANTO_PATH=data/dictionaries/cc-canto.u8
+MAX_DICTIONARY_INPUT_CHARS=12000
+MAX_DICTIONARY_ALTERNATIVES=3
+MAX_DICTIONARY_TERM_CHARS=64
 TTS_TIMEOUT_SECONDS=20
 TRANSLATION_TIMEOUT_SECONDS=20
 TEMP_AUDIO_TTL_HOURS=4

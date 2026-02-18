@@ -48,3 +48,8 @@ temp/
 
 # Logs
 *.log
+
+# Local dictionary source data (licensed, large, environment-specific)
+data/dictionaries/*.u8
+data/dictionaries/*.txt
+!data/dictionaries/README.md

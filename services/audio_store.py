@@ -24,11 +24,24 @@ class AudioStore:
         filename = f"tts_{timestamp}_{uuid.uuid4().hex[:12]}.mp3"
         path = self.root / filename
         path.write_bytes(content)
-        return StoredAudio(
-            filename=filename,
-            url=f"/static/temp_audio/{filename}",
-            bytes_size=len(content),
-        )
+        return self._to_stored_audio(filename, path)
+
+    def save_audio_with_key(self, content: bytes, cache_key: str, prefix: str = "dict") -> StoredAudio:
+        filename = self._filename_for_key(cache_key, prefix)
+        path = self.root / filename
+        path.write_bytes(content)
+        return self._to_stored_audio(filename, path)
+
+    def get_audio_by_key(self, cache_key: str, prefix: str = "dict") -> StoredAudio | None:
+        filename = self._filename_for_key(cache_key, prefix)
+        path = self.root / filename
+        if not path.exists() or not path.is_file():
+            return None
+
+        # Touch on reuse so cleanup keeps frequently accessed files longer.
+        now_ts = datetime.now(UTC).timestamp()
+        os.utime(path, (now_ts, now_ts))
+        return self._to_stored_audio(filename, path)
 
     def cleanup(
         self,
@@ -74,3 +87,13 @@ class AudioStore:
         for path in files:
             total += path.stat().st_size
         return total
+
+    def _filename_for_key(self, cache_key: str, prefix: str) -> str:
+        return f"{prefix}_{cache_key}.mp3"
+
+    def _to_stored_audio(self, filename: str, path: Path) -> StoredAudio:
+        return StoredAudio(
+            filename=filename,
+            url=f"/static/temp_audio/{filename}",
+            bytes_size=path.stat().st_size,
+        )

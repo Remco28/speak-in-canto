@@ -301,6 +301,42 @@ button[disabled] {
   background: var(--accent-soft);
 }
 
+.token.dictionary-hit {
+  background: #e8eef6;
+}
+
+.reader-mode-row {
+  margin-bottom: 8px;
+}
+
+.dictionary-popover {
+  position: fixed;
+  z-index: 40;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 24px));
+  overflow: auto;
+  border: 1px solid #d9e1e7;
+  border-radius: 10px;
+  background: #fbfdff;
+  box-shadow: 0 10px 24px rgba(21, 34, 47, 0.22);
+  padding: 10px;
+}
+
+.dictionary-term {
+  margin: 0;
+  font-weight: 700;
+}
+
+.dictionary-definitions,
+.dictionary-alternatives {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.dictionary-alternatives p {
+  margin: 0 0 6px;
+}
+
 .inline-player-controls {
   margin-top: 14px;
   display: flex;

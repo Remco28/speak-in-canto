@@ -19,11 +19,18 @@
     {% endwith %}
 
     <form method="post" action="{{ url_for('auth.login') }}">
+      <input type="hidden" name="next" value="{{ next_url or '' }}">
+
       <label for="username">Username</label>
       <input id="username" name="username" type="text" required>
 
       <label for="password">Password</label>
       <input id="password" name="password" type="password" required>
+
+      <label for="remember_me">
+        <input id="remember_me" name="remember_me" type="checkbox" value="1">
+        Remember me for 30 days
+      </label>
 
       <button type="submit">Log In</button>
     </form>
