@@ -41,6 +41,7 @@ Use one method:
 
 ## TTS Guardrails
 - `MAX_INPUT_CHARS` (default `12000`)
+- `TEMP_AUDIO_DIR` (default `static/temp_audio`)
 - `TTS_TIMEOUT_SECONDS` (default `20`)
 - `TEMP_AUDIO_TTL_HOURS` (default `4`)
 - `MAX_TEMP_AUDIO_FILES` (default `120`)
@@ -87,6 +88,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/gcp-sa.json
 GROK_MODEL=grok-4-1-fast-non-reasoning
 GROK_BASE_URL=https://api.x.ai/v1
 MAX_INPUT_CHARS=12000
+TEMP_AUDIO_DIR=static/temp_audio
 MAX_TRANSLATION_INPUT_CHARS=12000
 DICTIONARY_ENABLED=true
 DICTIONARY_CC_CEDICT_PATH=data/dictionaries/cc-cedict.u8
