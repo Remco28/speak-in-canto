@@ -32,7 +32,7 @@ class FakeTTSValid:
         return voice_name == "yue-HK-Standard-A"
 
 
-class Task02RouteTests(unittest.TestCase):
+class TTSRouteTests(unittest.TestCase):
     def setUp(self) -> None:
         self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
         os.close(self.db_fd)

@@ -10,7 +10,7 @@ from app import create_app
 from models import UsageLog, User, db
 
 
-class Task03RouteTests(unittest.TestCase):
+class ReaderAndAdminRouteTests(unittest.TestCase):
     def setUp(self) -> None:
         self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
         os.close(self.db_fd)

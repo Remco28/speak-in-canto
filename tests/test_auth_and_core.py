@@ -10,7 +10,7 @@ from app import create_app
 from models import User, UsageLog, db, log_usage
 
 
-class Task01TestCase(unittest.TestCase):
+class AuthAndCoreTests(unittest.TestCase):
     def setUp(self) -> None:
         self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
         os.close(self.db_fd)

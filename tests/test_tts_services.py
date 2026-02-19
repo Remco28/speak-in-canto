@@ -31,7 +31,7 @@ class FakeTTS:
         )()
 
 
-class Task02ServiceTests(unittest.TestCase):
+class TTSServicesTests(unittest.TestCase):
     def test_high_quality_retries_by_splitting_when_sentence_too_long(self):
         class FakeHQTTS:
             def synthesize_text(self, text, _voice_name):
