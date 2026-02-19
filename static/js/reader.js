@@ -1,3 +1,8 @@
+import { createDictionaryController } from "./reader/dictionary.js";
+import { createSyncController } from "./reader/sync.js";
+import { createTranslationController } from "./reader/translation.js";
+import { createVoiceController } from "./reader/voice.js";
+
 (function () {
   const config = window.READER_CONFIG || {};
   const maxInputChars = Number(config.maxInputChars || 12000);
@@ -17,43 +22,61 @@
   const syncModeNote = document.getElementById("sync-mode-note");
   const readerModeToggle = document.getElementById("reader-mode-toggle");
   const voiceModeToggle = document.getElementById("voice-mode-toggle");
-  const inlinePlayBtn = document.getElementById("inline-play-btn");
-  const inlinePauseBtn = document.getElementById("inline-pause-btn");
   const voiceDropdownBtn = document.getElementById("voice-dropdown-btn");
   const voiceDropdownMenu = document.getElementById("voice-dropdown-menu");
   const downloadBtn = document.getElementById("download-btn");
-  const translateBtn = document.getElementById("translate-btn");
-  const translationStatus = document.getElementById("translation-status");
-  const translationError = document.getElementById("translation-error");
-  const translationOutput = document.getElementById("translation-output");
-  const dictionaryPopover = document.getElementById("dictionary-popover");
-  const dictionaryStatus = document.getElementById("dictionary-status");
-  const dictionaryTerm = document.getElementById("dictionary-term");
-  const dictionaryDefinitions = document.getElementById("dictionary-definitions");
-  const dictionaryAlternativesWrap = document.getElementById("dictionary-alternatives-wrap");
-  const dictionaryAlternatives = document.getElementById("dictionary-alternatives");
 
-  let tokenToTime = new Map();
-  let timeEntries = [];
-  let timeEntrySeconds = [];
-  let maxTokenId = 0;
-  let activeToken = null;
+  const translationController = createTranslationController({
+    translateBtn: document.getElementById("translate-btn"),
+    translationStatus: document.getElementById("translation-status"),
+    translationError: document.getElementById("translation-error"),
+    translationOutput: document.getElementById("translation-output"),
+    textInput,
+    maxTranslationInputChars,
+  });
+
   let syncEnabled = true;
-  let currentVoiceMode = "standard";
   let currentReaderMode = "read";
-  let selectedVoiceId = "";
-  let voicePins = new Set();
-  let animationHandle = null;
   let currentSpeed = 1.0;
   let currentRenderedText = "";
-  let activeDictionarySpan = null;
-  let dictionaryAudio = null;
 
   const SEEK_EPSILON_SECONDS = 0.02;
-  const HIGHLIGHT_EPSILON_SECONDS = 0.03;
   const SPEED_MIN = 0.5;
   const SPEED_MAX = 2.0;
   const SPEED_STEP = 0.1;
+
+  const voiceController = createVoiceController({
+    voiceCatalog,
+    voiceDropdownBtn,
+    voiceDropdownMenu,
+    voiceModeToggle,
+    syncModeNote,
+    speedNote,
+  });
+
+  const dictionaryController = createDictionaryController({
+    dictionaryPopover: document.getElementById("dictionary-popover"),
+    dictionaryStatus: document.getElementById("dictionary-status"),
+    dictionaryTerm: document.getElementById("dictionary-term"),
+    dictionaryDefinitions: document.getElementById("dictionary-definitions"),
+    dictionaryAlternativesWrap: document.getElementById("dictionary-alternatives-wrap"),
+    dictionaryAlternatives: document.getElementById("dictionary-alternatives"),
+    tokenView,
+    getRenderedText: () => currentRenderedText,
+    getVoiceSettings: () => ({
+      voiceName: voiceController.getSelectedVoiceId(),
+      voiceMode: voiceController.getCurrentVoiceMode(),
+      speed: currentSpeed,
+    }),
+  });
+
+  const syncController = createSyncController({
+    tokenView,
+    audio,
+    seekEpsilonSeconds: SEEK_EPSILON_SECONDS,
+    highlightEpsilonSeconds: 0.03,
+    isSyncEnabled: () => syncEnabled,
+  });
 
   function setError(msg) {
     if (!msg) {
@@ -100,200 +123,6 @@
     downloadBtn.textContent = `Download MP3 (${voiceLabel})`;
   }
 
-  function setTranslationLoading(isLoading) {
-    if (!translateBtn) return;
-    translateBtn.disabled = isLoading;
-    translateBtn.textContent = isLoading ? "Translating..." : "Translate to English";
-    if (translationStatus) {
-      translationStatus.hidden = !isLoading;
-      translationStatus.textContent = isLoading ? "Translating..." : "";
-    }
-  }
-
-  function setTranslationError(msg) {
-    if (!translationError) return;
-    if (!msg) {
-      translationError.hidden = true;
-      translationError.textContent = "";
-      return;
-    }
-    translationError.hidden = false;
-    translationError.textContent = msg;
-  }
-
-  function setTranslationOutput(text) {
-    if (!translationOutput) return;
-    translationOutput.textContent = text || "";
-  }
-
-  function clearDictionaryView() {
-    if (!dictionaryPopover) return;
-    dictionaryPopover.hidden = true;
-    dictionaryPopover.style.left = "0px";
-    dictionaryPopover.style.top = "0px";
-    if (dictionaryStatus) {
-      dictionaryStatus.hidden = true;
-      dictionaryStatus.textContent = "";
-    }
-    if (dictionaryTerm) {
-      dictionaryTerm.textContent = "";
-    }
-    if (dictionaryDefinitions) {
-      dictionaryDefinitions.innerHTML = "";
-    }
-    if (dictionaryAlternativesWrap) {
-      dictionaryAlternativesWrap.hidden = true;
-      dictionaryAlternativesWrap.open = false;
-    }
-    if (dictionaryAlternatives) {
-      dictionaryAlternatives.innerHTML = "";
-    }
-    activeDictionarySpan = null;
-    tokenView.querySelectorAll(".token.dictionary-hit").forEach((node) => node.classList.remove("dictionary-hit"));
-  }
-
-  function setDictionaryStatus(message) {
-    if (!dictionaryPopover || !dictionaryStatus) return;
-    dictionaryPopover.hidden = false;
-    dictionaryStatus.hidden = !message;
-    dictionaryStatus.textContent = message || "";
-  }
-
-  function placeDictionaryPopover(anchorEl) {
-    if (!dictionaryPopover || !anchorEl) return;
-    const rect = anchorEl.getBoundingClientRect();
-    const margin = 10;
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight;
-
-    const desiredLeft = rect.left + margin;
-    const desiredTop = rect.bottom + margin;
-
-    dictionaryPopover.style.left = `${Math.max(margin, Math.min(desiredLeft, viewportW - dictionaryPopover.offsetWidth - margin))}px`;
-    dictionaryPopover.style.top = `${Math.max(margin, Math.min(desiredTop, viewportH - dictionaryPopover.offsetHeight - margin))}px`;
-  }
-
-  function renderDictionaryCandidate(candidate) {
-    if (!candidate) return;
-    if (dictionaryTerm) {
-      const source = candidate.source ? ` (${candidate.source})` : "";
-      const jyutping = candidate.jyutping ? ` · ${candidate.jyutping}` : "";
-      dictionaryTerm.textContent = `${candidate.term}${jyutping}${source}`;
-    }
-    if (dictionaryDefinitions) {
-      dictionaryDefinitions.innerHTML = "";
-      (candidate.definitions || []).forEach((definition) => {
-        const li = document.createElement("li");
-        li.textContent = definition;
-        dictionaryDefinitions.appendChild(li);
-      });
-    }
-  }
-
-  function renderDictionaryAlternatives(alternatives) {
-    if (!dictionaryAlternativesWrap || !dictionaryAlternatives) return;
-    dictionaryAlternatives.innerHTML = "";
-    if (!alternatives || alternatives.length === 0) {
-      dictionaryAlternativesWrap.hidden = true;
-      dictionaryAlternativesWrap.open = false;
-      return;
-    }
-    alternatives.forEach((candidate) => {
-      const li = document.createElement("li");
-      const defs = (candidate.definitions || []).join("; ");
-      li.textContent = `${candidate.term}: ${defs}`;
-      dictionaryAlternatives.appendChild(li);
-    });
-    dictionaryAlternativesWrap.hidden = false;
-  }
-
-  function highlightDictionarySpan(span) {
-    tokenView.querySelectorAll(".token.dictionary-hit").forEach((node) => node.classList.remove("dictionary-hit"));
-    if (!span) {
-      activeDictionarySpan = null;
-      return;
-    }
-    activeDictionarySpan = span;
-    for (let tokenId = span.start; tokenId < span.end; tokenId += 1) {
-      const node = tokenView.querySelector(`[data-token-id="${tokenId}"]`);
-      if (node) {
-        node.classList.add("dictionary-hit");
-      }
-    }
-  }
-
-  async function speakDictionaryTerm(term) {
-    if (!term || !selectedVoiceId) return;
-    try {
-      const response = await fetch("/api/dictionary/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: term,
-          voice_name: selectedVoiceId,
-          voice_mode: currentVoiceMode,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.audio_url) {
-        return;
-      }
-      if (!dictionaryAudio) {
-        dictionaryAudio = new Audio();
-      }
-      dictionaryAudio.src = data.audio_url;
-      dictionaryAudio.playbackRate = currentSpeed;
-      const p = dictionaryAudio.play();
-      if (p && typeof p.catch === "function") {
-        p.catch(() => {});
-      }
-    } catch (_err) {
-      // Best effort; lookup result already shown.
-    }
-  }
-
-  async function lookupDictionaryAtIndex(tokenId, anchorEl) {
-    if (!currentRenderedText) {
-      setDictionaryStatus("No rendered text to look up yet. Press Read first.");
-      placeDictionaryPopover(anchorEl);
-      return;
-    }
-    try {
-      setDictionaryStatus("Looking up...");
-      placeDictionaryPopover(anchorEl);
-      const response = await fetch("/api/dictionary/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: currentRenderedText, index: tokenId }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setDictionaryStatus(data.error || "Dictionary lookup failed.");
-        placeDictionaryPopover(anchorEl);
-        return;
-      }
-
-      dictionaryPopover.hidden = false;
-      setDictionaryStatus("");
-      placeDictionaryPopover(anchorEl);
-      if (!data.best) {
-        if (dictionaryTerm) dictionaryTerm.textContent = "No definition found";
-        if (dictionaryDefinitions) dictionaryDefinitions.innerHTML = "";
-        renderDictionaryAlternatives([]);
-        highlightDictionarySpan(null);
-        return;
-      }
-
-      renderDictionaryCandidate(data.best);
-      renderDictionaryAlternatives(data.alternatives || []);
-      highlightDictionarySpan({ start: Number(data.best.start), end: Number(data.best.end) });
-      await speakDictionaryTerm(data.best.term);
-    } catch (_err) {
-      setDictionaryStatus("Network or server error.");
-      placeDictionaryPopover(anchorEl);
-    }
-  }
-
   function setSpeed(value) {
     const clamped = Math.max(SPEED_MIN, Math.min(SPEED_MAX, value));
     const rounded = Math.round(clamped / SPEED_STEP) * SPEED_STEP;
@@ -304,282 +133,35 @@
     if (speedIncreaseBtn) speedIncreaseBtn.disabled = currentSpeed >= SPEED_MAX;
   }
 
-  function getCurrentTokenByTime(currentTime) {
-    if (timeEntries.length === 0) return null;
+  function applyReaderMode(mode) {
+    currentReaderMode = mode === "dictionary" ? "dictionary" : "read";
+    if (readerModeToggle) readerModeToggle.checked = currentReaderMode === "dictionary";
 
-    let low = 0;
-    let high = timeEntrySeconds.length - 1;
-    let found = null;
-
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      const ts = timeEntrySeconds[mid];
-      if (ts <= currentTime) {
-        found = mid;
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
-    }
-
-    if (found === null) {
-      return null;
-    }
-    return timeEntries[found].tokenId;
-  }
-
-  function setActiveToken(tokenId) {
-    if (activeToken === tokenId) {
+    if (currentReaderMode === "dictionary") {
+      syncController.setActiveToken(null);
+      syncController.stopSyncLoop();
+      dictionaryController.setStatus("Tap a word or phrase in Reader.");
       return;
     }
-    if (activeToken !== null) {
-      const prev = tokenView.querySelector(`[data-token-id="${activeToken}"]`);
-      if (prev) prev.classList.remove("active");
-    }
 
-    activeToken = tokenId;
-
-    if (activeToken !== null) {
-      const next = tokenView.querySelector(`[data-token-id="${activeToken}"]`);
-      if (next) next.classList.add("active");
-    }
+    dictionaryController.clearView();
   }
 
-  function renderTokens(tokens, markToToken) {
-    tokenView.innerHTML = "";
-    tokenToTime = new Map();
-    timeEntries = [];
-    timeEntrySeconds = [];
-    maxTokenId = Math.max(0, (tokens || []).length - 1);
-    currentRenderedText = (tokens || []).map((token) => token.char || "").join("");
-    activeToken = null;
-    clearDictionaryView();
-
-    const markByToken = new Map();
-    Object.entries(markToToken || {}).forEach(([mark, tokenId]) => {
-      markByToken.set(Number(tokenId), mark);
-    });
-
-    const frag = document.createDocumentFragment();
-
-    tokens.forEach((token) => {
-      const wrapper = document.createElement("span");
-      wrapper.className = "token";
-      wrapper.dataset.tokenId = String(token.token_id);
-
-      const mark = markByToken.get(Number(token.token_id));
-      if (mark) {
-        wrapper.dataset.mark = mark;
-      }
-
-      const ruby = document.createElement("span");
-      ruby.className = "ruby";
-      ruby.textContent = token.jyutping || "";
-
-      const char = document.createElement("span");
-      char.className = "char";
-      char.textContent = token.char;
-
-      wrapper.appendChild(ruby);
-      wrapper.appendChild(char);
-
-      wrapper.addEventListener("click", function () {
-        const tokenId = Number(wrapper.dataset.tokenId);
-        if (currentReaderMode === "dictionary") {
-          lookupDictionaryAtIndex(tokenId, wrapper);
-          return;
-        }
-
-        if (!syncEnabled) {
-          return;
-        }
-        const seekTime = resolveSeekTime(tokenId);
-        if (seekTime === null) {
-          return;
-        }
-        audio.currentTime = Math.max(0, seekTime + SEEK_EPSILON_SECONDS);
-        setActiveToken(tokenId);
-        const playPromise = audio.play();
-        if (playPromise && typeof playPromise.catch === "function") {
-          playPromise.catch(() => {});
-        }
-      });
-
-      frag.appendChild(wrapper);
-    });
-
-    tokenView.appendChild(frag);
-  }
-
-  function buildTimeIndex(timepoints, markToToken) {
-    tokenToTime = new Map();
-    (timepoints || []).forEach((point) => {
-      const tokenId = markToToken[point.mark_name];
-      if (tokenId === undefined || tokenId === null) {
-        return;
-      }
-      tokenToTime.set(Number(tokenId), Number(point.seconds));
-    });
-
-    tokenToTime = new Map([...tokenToTime.entries()].sort((a, b) => a[0] - b[0]));
-    timeEntries = [...tokenToTime.entries()]
-      .map(([tokenId, seconds]) => ({ tokenId, seconds }))
-      .sort((a, b) => a.seconds - b.seconds);
-    timeEntrySeconds = timeEntries.map((entry) => entry.seconds);
-  }
-
-  function resolveSeekTime(tokenId) {
-    if (tokenToTime.size === 0) {
-      return null;
-    }
-    if (tokenToTime.has(tokenId)) {
-      return tokenToTime.get(tokenId);
-    }
-
-    let left = tokenId - 1;
-    let right = tokenId + 1;
-    while (left >= 0 || right <= maxTokenId) {
-      if (left >= 0 && tokenToTime.has(left)) {
-        return tokenToTime.get(left);
-      }
-      if (right <= maxTokenId && tokenToTime.has(right)) {
-        return tokenToTime.get(right);
-      }
-      left -= 1;
-      right += 1;
-    }
-
-    return null;
-  }
-
-  function getModeOptions(mode) {
-    return mode === "high_quality" ? voiceCatalog.high_quality : voiceCatalog.standard;
-  }
-
-  function getVoiceLabelById(mode, voiceId) {
-    const options = getModeOptions(mode);
-    const found = (options || []).find((voice) => {
-      const id = typeof voice === "string" ? voice : voice.id;
-      return id === voiceId;
-    });
-    if (!found) return voiceId;
-    return labelForVoice(found);
-  }
-
-  function sortedOptionsWithPins(options) {
-    const pinned = [];
-    const unpinned = [];
-    (options || []).forEach((voice) => {
-      const id = typeof voice === "string" ? voice : voice.id;
-      if (voicePins.has(id)) {
-        pinned.push(voice);
-      } else {
-        unpinned.push(voice);
-      }
-    });
-    return [...pinned, ...unpinned];
-  }
-
-  function labelForVoice(voice) {
-    if (typeof voice === "string") {
-      return voice;
-    }
-    return voice.label || voice.id;
-  }
-
-  function renderVoiceMenu() {
-    voiceDropdownMenu.innerHTML = "";
-    const options = sortedOptionsWithPins(getModeOptions(currentVoiceMode));
-
-    options.forEach((voice) => {
-      const id = typeof voice === "string" ? voice : voice.id;
-      const row = document.createElement("div");
-      row.className = "voice-option-row";
-      if (id === selectedVoiceId) {
-        row.classList.add("selected");
-      }
-
-      const selectBtn = document.createElement("button");
-      selectBtn.type = "button";
-      selectBtn.className = "voice-option-select";
-      selectBtn.textContent = labelForVoice(voice);
-      selectBtn.addEventListener("click", function () {
-        selectedVoiceId = id;
-        updateVoiceButtonLabel();
-        renderVoiceMenu();
-        closeVoiceMenu();
-      });
-
-      const pinBtn = document.createElement("button");
-      pinBtn.type = "button";
-      pinBtn.className = "pin-btn";
-      pinBtn.textContent = "★";
-      if (voicePins.has(id)) {
-        pinBtn.classList.add("pinned");
-      }
-      pinBtn.addEventListener("click", async function (event) {
-        event.stopPropagation();
-        await togglePin(id, currentVoiceMode);
-      });
-
-      row.appendChild(selectBtn);
-      row.appendChild(pinBtn);
-      voiceDropdownMenu.appendChild(row);
-    });
-  }
-
-  function updateVoiceButtonLabel() {
-    const options = getModeOptions(currentVoiceMode);
-    const found = (options || []).find((voice) => {
-      const id = typeof voice === "string" ? voice : voice.id;
-      return id === selectedVoiceId;
-    });
-    if (found) {
-      voiceDropdownBtn.textContent = labelForVoice(found);
+  function applyVoiceUi(mode) {
+    const isHighQuality = mode === "high_quality";
+    if (isHighQuality) {
+      syncEnabled = false;
+      syncController.setActiveToken(null);
+      syncModeNote.hidden = false;
+      syncModeNote.textContent = "High Quality mode does not support character sync.";
+      if (speedNote) speedNote.hidden = false;
       return;
     }
-    voiceDropdownBtn.textContent = "Select voice";
-  }
 
-  function openVoiceMenu() {
-    voiceDropdownMenu.hidden = false;
-  }
-
-  function closeVoiceMenu() {
-    voiceDropdownMenu.hidden = true;
-  }
-
-  async function loadPins() {
-    try {
-      const response = await fetch("/api/user/voice-pins");
-      if (!response.ok) return;
-      const data = await response.json();
-      voicePins = new Set((data.pins || []).map((pin) => pin.voice_id));
-    } catch (_err) {
-      // Non-fatal for reader.
-    }
-  }
-
-  async function togglePin(voiceId, voiceMode) {
-    try {
-      const response = await fetch("/api/user/voice-pins/toggle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voice_id: voiceId, voice_mode: voiceMode }),
-      });
-      if (!response.ok) {
-        return;
-      }
-      const data = await response.json();
-      if (data.pinned) {
-        voicePins.add(voiceId);
-      } else {
-        voicePins.delete(voiceId);
-      }
-      renderVoiceMenu();
-    } catch (_err) {
-      // Non-fatal for reader.
-    }
+    syncEnabled = true;
+    syncModeNote.hidden = true;
+    syncModeNote.textContent = "";
+    if (speedNote) speedNote.hidden = true;
   }
 
   async function synthesize() {
@@ -596,13 +178,12 @@
       return;
     }
 
-    if (!selectedVoiceId) {
+    const requestVoiceId = voiceController.getSelectedVoiceId();
+    const requestVoiceMode = voiceController.getCurrentVoiceMode();
+    if (!requestVoiceId) {
       setError("Please select a voice.");
       return;
     }
-
-    const requestVoiceId = selectedVoiceId;
-    const requestVoiceMode = currentVoiceMode;
 
     setLoading(true);
 
@@ -624,10 +205,21 @@
         return;
       }
 
-      renderTokens(data.tokens || [], data.mark_to_token || {});
-      buildTimeIndex(data.timepoints || [], data.mark_to_token || {});
+      syncController.renderTokens(data.tokens || [], data.mark_to_token || {}, async (tokenId, wrapper) => {
+        if (currentReaderMode === "dictionary") {
+          await dictionaryController.lookupAtIndex(tokenId, wrapper);
+          return;
+        }
+
+        if (!syncEnabled) return;
+        syncController.seekAndPlay(tokenId);
+      });
+
+      currentRenderedText = (data.tokens || []).map((token) => token.char || "").join("");
+      dictionaryController.clearView();
+      syncController.buildTimeIndex(data.timepoints || [], data.mark_to_token || {});
       syncEnabled = Boolean(data.sync_supported);
-      setDownloadState(data.audio_url, getVoiceLabelById(requestVoiceMode, requestVoiceId));
+      setDownloadState(data.audio_url, voiceController.getVoiceLabelById(requestVoiceMode, requestVoiceId));
 
       audio.src = data.audio_url;
       audio.playbackRate = currentSpeed;
@@ -643,15 +235,14 @@
         syncModeNote.hidden = true;
         syncModeNote.textContent = "";
       }
+
       if (data.jyutping_available === false) {
         syncModeNote.hidden = false;
         syncModeNote.textContent = "Jyutping dependency unavailable on server; showing characters only.";
       }
 
       const playPromise = audio.play();
-      if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(() => {});
-      }
+      if (playPromise && typeof playPromise.catch === "function") playPromise.catch(() => {});
     } catch (_err) {
       setError("Network or server error.");
     } finally {
@@ -659,212 +250,50 @@
     }
   }
 
-  async function translateToEnglish() {
-    setTranslationError("");
-
-    const text = textInput.value;
-    if (!text.trim()) {
-      setTranslationError("Please enter text.");
-      return;
-    }
-    if (text.trim().length > maxTranslationInputChars) {
-      setTranslationError(`Text exceeds max length (${maxTranslationInputChars}).`);
-      return;
-    }
-
-    setTranslationLoading(true);
-    try {
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setTranslationError(data.error || "Translation failed.");
-        return;
-      }
-      setTranslationOutput(data.translation || "");
-    } catch (_err) {
-      setTranslationError("Network or server error.");
-    } finally {
-      setTranslationLoading(false);
-    }
-  }
-
-  function applyVoiceMode(mode) {
-    if (mode === "high_quality" && (!voiceCatalog.high_quality || voiceCatalog.high_quality.length === 0)) {
-      currentVoiceMode = "standard";
-      if (voiceModeToggle) {
-        voiceModeToggle.checked = false;
-      }
-      syncModeNote.hidden = false;
-      syncModeNote.textContent = "High Quality voices are unavailable in this project.";
-      if (speedNote) speedNote.hidden = true;
-      return;
-    }
-
-    currentVoiceMode = mode;
-
-    const options = getModeOptions(mode);
-    if (!options || options.length === 0) {
-      selectedVoiceId = "";
-    } else {
-      const existing = options.some((voice) => (typeof voice === "string" ? voice : voice.id) === selectedVoiceId);
-      if (!existing) {
-        selectedVoiceId = typeof options[0] === "string" ? options[0] : options[0].id;
-      }
-    }
-
-    renderVoiceMenu();
-    updateVoiceButtonLabel();
-
-    const isHighQuality = mode === "high_quality";
-    if (isHighQuality) {
-      syncEnabled = false;
-      setActiveToken(null);
-      syncModeNote.hidden = false;
-      syncModeNote.textContent = "High Quality mode does not support character sync.";
-      if (speedNote) speedNote.hidden = false;
-    } else {
-      syncEnabled = true;
-      syncModeNote.hidden = true;
-      syncModeNote.textContent = "";
-      if (speedNote) speedNote.hidden = true;
-    }
-  }
-
-  function applyReaderMode(mode) {
-    currentReaderMode = mode === "dictionary" ? "dictionary" : "read";
-    if (readerModeToggle) {
-      readerModeToggle.checked = currentReaderMode === "dictionary";
-    }
-    if (currentReaderMode === "dictionary") {
-      setActiveToken(null);
-      stopSyncLoop();
-      setDictionaryStatus("Tap a word or phrase in Reader.");
-      return;
-    }
-    clearDictionaryView();
-  }
-
-  function syncHighlightFrame() {
-    if (syncEnabled && !audio.paused && !audio.ended) {
-      const tokenId = getCurrentTokenByTime(audio.currentTime + HIGHLIGHT_EPSILON_SECONDS);
-      setActiveToken(tokenId);
-      animationHandle = window.requestAnimationFrame(syncHighlightFrame);
-      return;
-    }
-    animationHandle = null;
-  }
-
-  function startSyncLoop() {
-    if (animationHandle !== null) {
-      return;
-    }
-    animationHandle = window.requestAnimationFrame(syncHighlightFrame);
-  }
-
-  function stopSyncLoop() {
-    if (animationHandle !== null) {
-      window.cancelAnimationFrame(animationHandle);
-      animationHandle = null;
-    }
-  }
-
   textInput.addEventListener("input", updateCounter);
-  if (speedDecreaseBtn) {
-    speedDecreaseBtn.addEventListener("click", function () {
-      setSpeed(currentSpeed - SPEED_STEP);
-    });
-  }
 
+  if (speedDecreaseBtn) {
+    speedDecreaseBtn.addEventListener("click", () => setSpeed(currentSpeed - SPEED_STEP));
+  }
   if (speedIncreaseBtn) {
-    speedIncreaseBtn.addEventListener("click", function () {
-      setSpeed(currentSpeed + SPEED_STEP);
-    });
+    speedIncreaseBtn.addEventListener("click", () => setSpeed(currentSpeed + SPEED_STEP));
   }
 
   readBtn.addEventListener("click", synthesize);
-  if (translateBtn) {
-    translateBtn.addEventListener("click", translateToEnglish);
-  }
+  translationController.bind();
 
-  audio.addEventListener("play", startSyncLoop);
-  audio.addEventListener("pause", stopSyncLoop);
-  audio.addEventListener("ended", stopSyncLoop);
-  audio.addEventListener("seeking", function () {
-    if (!syncEnabled) return;
-    const tokenId = getCurrentTokenByTime(audio.currentTime + HIGHLIGHT_EPSILON_SECONDS);
-    setActiveToken(tokenId);
-  });
-
-  if (inlinePlayBtn) {
-    inlinePlayBtn.addEventListener("click", function () {
-      const p = audio.play();
-      if (p && typeof p.catch === "function") {
-        p.catch(() => {});
-      }
-    });
-  }
-
-  if (inlinePauseBtn) {
-    inlinePauseBtn.addEventListener("click", function () {
-      audio.pause();
-    });
-  }
-
-  if (voiceModeToggle) {
-    voiceModeToggle.addEventListener("change", function () {
-      applyVoiceMode(voiceModeToggle.checked ? "high_quality" : "standard");
-    });
-  }
+  audio.addEventListener("play", () => syncController.startSyncLoop());
+  audio.addEventListener("pause", () => syncController.stopSyncLoop());
+  audio.addEventListener("ended", () => syncController.stopSyncLoop());
+  audio.addEventListener("seeking", () => syncController.handleSeeking());
 
   if (readerModeToggle) {
-    readerModeToggle.addEventListener("change", function () {
+    readerModeToggle.addEventListener("change", () => {
       applyReaderMode(readerModeToggle.checked ? "dictionary" : "read");
     });
   }
 
-  if (voiceDropdownBtn) {
-    voiceDropdownBtn.addEventListener("click", function () {
-      if (voiceDropdownMenu.hidden) {
-        openVoiceMenu();
-      } else {
-        closeVoiceMenu();
-      }
-    });
-  }
-
-  document.addEventListener("click", function (event) {
-    if (!voiceDropdownMenu || !voiceDropdownBtn) return;
-    const within = voiceDropdownMenu.contains(event.target) || voiceDropdownBtn.contains(event.target);
-    if (!within) {
-      closeVoiceMenu();
-    }
-
-    if (
-      dictionaryPopover &&
-      !dictionaryPopover.hidden &&
-      !dictionaryPopover.contains(event.target) &&
-      !tokenView.contains(event.target)
-    ) {
-      clearDictionaryView();
-    }
+  voiceController.bind({
+    onModeChangeHandler: (mode) => {
+      applyVoiceUi(mode);
+    },
   });
 
-  window.addEventListener("resize", function () {
-    if (dictionaryPopover && !dictionaryPopover.hidden) {
-      clearDictionaryView();
-    }
+  document.addEventListener("click", (event) => {
+    voiceController.handleDocumentClick(event);
+    dictionaryController.handleDocumentClick(event);
+  });
+
+  window.addEventListener("resize", () => {
+    dictionaryController.handleResize();
   });
 
   (async function init() {
     updateCounter();
     setSpeed(1.0);
     setDownloadState("", "");
-    await loadPins();
-    applyVoiceMode("standard");
+    await voiceController.init();
+    applyVoiceUi(voiceController.getCurrentVoiceMode());
     applyReaderMode("read");
   })();
 })();

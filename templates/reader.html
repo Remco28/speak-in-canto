@@ -114,6 +114,6 @@
         voices: {{ voice_catalog|tojson }},
       };
     </script>
-    <script src="{{ url_for('static', filename='js/reader.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/reader.js') }}"></script>
   </body>
 </html>
