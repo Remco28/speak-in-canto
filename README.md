@@ -29,6 +29,15 @@ Cantonese reading app with:
 - Grok API
 - Gunicorn (container runtime)
 
+## Frontend Structure
+- `static/js/reader.js` (module orchestrator)
+- `static/js/reader/sync.js` (token timing + highlight sync)
+- `static/js/reader/voice.js` (voice mode/dropdown/pins)
+- `static/js/reader/dictionary.js` (lookup popover + term speak)
+- `static/js/reader/translation.js` (translation request/state)
+
+Reader frontend now uses ES modules (`<script type="module">` in `templates/reader.html`).
+
 ## Local Development
 1. Create venv and install deps:
 ```bash

@@ -1,6 +1,6 @@
 # Environment Variables
 
-This is the runtime environment variable reference for Speak-in-Canto.
+This is the runtime environment variable reference for Canto Reader.
 
 ## Core Runtime
 - `SECRET_KEY`

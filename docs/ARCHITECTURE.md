@@ -83,3 +83,65 @@ A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playbac
 - **Purpose:** Translate reader input text to English for comprehension support.
 - **Flow:** Reader UI -> Flask translate route -> Grok API -> JSON translation response -> render below reader.
 - **Guardrails:** Input length cap + upstream timeout + controlled error responses.
+
+## 10. Refactor Kickoff (2026-02-18)
+- **Status:** Active.
+- **Branch:** `refactor/codebase-streamline-2026-02-18`
+- **Goal:** Reduce bloat and improve maintainability without changing user-visible behavior.
+- **Method:** Small, low-risk cleanup steps with verification after each step.
+- **Initial sequence:**
+  1. Inventory modules/files and identify dead or duplicate code.
+  2. Trace core runtime paths (auth, TTS, dictionary, translation).
+  3. Consolidate repeated backend logic (validation/error/config patterns).
+  4. Simplify frontend state/event handling where safe.
+  5. Remove stale docs/files and align tests/docs with final structure.
+- **Non-goals (this phase):**
+  - No product feature changes.
+  - No UI redesign work.
+  - No infra/provider changes unless required for correctness.
+
+## 11. Refactor Findings (Inventory + Runtime Review)
+- **Priority A (Safe cleanup first):**
+  - Remove dead frontend hooks for inline play/pause controls no longer present in template.
+  - Remove unused templates that are not rendered by any active route.
+  - Remove empty legacy archive directories and stale references where applicable.
+- **Priority B (Shared backend logic):**
+  - Consolidate monthly usage aggregation logic shared across admin page and admin API.
+  - Reduce repetitive config lookups by centralizing typed config access helpers.
+  - Normalize repeated JSON payload validation patterns across route modules.
+- **Priority C (Maintainability improvements):**
+  - Split `static/js/reader.js` into smaller modules by responsibility (voice UI, player/sync, dictionary, translation).
+  - Normalize test naming from task-era names to feature-oriented names.
+  - Archive or modernize stale historical planning docs that no longer reflect current structure.
+
+## 12. Refactor Execution Plan
+1. **Phase 1: Dead-code and stale-file cleanup**
+   - Target: no behavior changes, no API contract changes.
+   - Validation: app boots; core pages render; targeted test run.
+2. **Phase 2: Shared backend helper extraction**
+   - Target: remove duplicated logic without changing responses.
+   - Validation: admin/dashboard and admin usage API parity.
+3. **Phase 3: Config/access cleanup**
+   - Target: improve readability and reduce config drift risk.
+   - Validation: full test run + manual smoke.
+4. **Phase 4: Frontend module split**
+   - Target: smaller maintainable JS units with same runtime behavior.
+   - Validation: reader, dictionary, translation, and playback smoke checks.
+5. **Phase 5: Test/doc alignment**
+   - Target: naming cleanup + retired docs archive strategy.
+   - Validation: full suite passing and docs cross-check.
+
+## 13. Refactor Progress (Current Branch)
+- **Completed:**
+  - Phase 1 dead/stale cleanup (unused templates, dead JS hooks).
+  - Phase 2 shared backend helper extraction (`usage_metrics`, `audio_policy`).
+  - Phase 3 config/access cleanup (`runtime_config` + reduced app factory duplication).
+  - Phase 4 frontend modularization of reader runtime:
+    - `static/js/reader/sync.js`
+    - `static/js/reader/voice.js`
+    - `static/js/reader/dictionary.js`
+    - `static/js/reader/translation.js`
+    - thin orchestrator in `static/js/reader.js`
+  - Phase 5 test naming normalization from task-era files to feature-oriented files.
+- **Verification status:**
+  - Full unit test suite passing after each major refactor step.

@@ -31,3 +31,7 @@
 [2026-02-13 15:57] [ARCHITECT]: DOCS UPDATE: Added repo `README.md`, `docs/ENVIRONMENT.md`, and deployment note capturing HQ sentence-length failure lesson + required guardrail envs to prevent repeat regressions.
 [2026-02-13 17:11] [ARCHITECT]: DOCS CLEANUP: Removed obsolete reusable/legacy docs from repo and added `comms/VPS_SWAP_SETUP.md` with copy-friendly VPS swap setup instructions.
 [2026-02-13 20:52] [CLAUDE]: IMPL DONE: Rebranded reader UI to `Canto Reader`, merged reader/media areas, moved admin/logout to low-emphasis footer links, and refreshed UI tests for updated branding copy.
+[2026-02-18 19:24] [ARCHITECT]: REFACTOR IN_PROGRESS: Started systematic codebase streamlining on branch `refactor/codebase-streamline-2026-02-18` with inventory + runtime-path audit and phased execution plan.
+[2026-02-18 19:24] [CLAUDE]: REFACTOR DONE: Removed dead frontend hooks and unused templates, extracted shared backend helpers (`services/usage_metrics.py`, `services/runtime_config.py`, `services/audio_policy.py`), and consolidated duplicated route logic without API behavior changes.
+[2026-02-18 19:24] [CLAUDE]: REFACTOR DONE: Modularized reader frontend into ES modules (`sync`, `voice`, `dictionary`, `translation`) with `static/js/reader.js` as orchestrator; switched reader template script loading to `type=module`.
+[2026-02-18 19:24] [CLAUDE]: REFACTOR DONE: Normalized test naming from task-era files to feature-oriented files, removed empty archive directory, refreshed architecture/environment/manifest docs, and re-validated full suite passing (44 tests).
