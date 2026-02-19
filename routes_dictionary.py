@@ -7,6 +7,7 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
 
+from services.audio_policy import cleanup_audio_store
 from services.audio_store import AudioStore
 from services.dictionary_loader import DictionaryLoader
 from services.dictionary_lookup import DictionaryLookupResult, DictionaryLookupService
@@ -79,7 +80,7 @@ def speak():
         return jsonify({"error": "Unsupported voice_name"}), 400
 
     store = AudioStore(current_app.config.get("TEMP_AUDIO_DIR", "static/temp_audio"))
-    _cleanup_audio_store(store)
+    cleanup_audio_store(current_app, store)
 
     cache_key = _dictionary_speak_cache_key(text=text, voice_name=voice_name, voice_mode=voice_mode)
     cached = store.get_audio_by_key(cache_key, prefix="dict")
@@ -97,7 +98,7 @@ def speak():
         return jsonify({"error": "Dictionary speech failed."}), 502
 
     stored = store.save_audio_with_key(chunk.audio_content, cache_key=cache_key, prefix="dict")
-    _cleanup_audio_store(store)
+    cleanup_audio_store(current_app, store)
     return jsonify({"audio_url": stored.url, "cached": False}), 200
 
 
@@ -158,14 +159,6 @@ def _resolve_path(path_value: str) -> Path:
     if path.is_absolute():
         return path
     return Path(current_app.root_path) / path
-
-
-def _cleanup_audio_store(store: AudioStore) -> None:
-    store.cleanup(
-        ttl_hours=int(current_app.config.get("TEMP_AUDIO_TTL_HOURS", 4)),
-        max_files=int(current_app.config.get("MAX_TEMP_AUDIO_FILES", 120)),
-        max_bytes=int(current_app.config.get("MAX_TEMP_AUDIO_BYTES", 300 * 1024 * 1024)),
-    )
 
 
 def _dictionary_speak_cache_key(text: str, voice_name: str, voice_mode: str) -> str:

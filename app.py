@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import sqlite3
 from pathlib import Path
-from datetime import timedelta
 
 import click
 from flask import Flask, render_template
@@ -18,6 +17,7 @@ from routes_dictionary import dictionary_bp
 from routes_translate import translate_bp
 from routes_tts import tts_bp
 from routes_user import user_bp
+from services.runtime_config import apply_runtime_config
 from services.tts_google import GoogleTTSWrapper
 
 
@@ -39,13 +39,6 @@ def _build_sqlite_path(app: Flask) -> Path:
     return path
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _enable_sqlite_pragmas(app: Flask) -> None:
     db_path = _build_sqlite_path(app)
     conn = sqlite3.connect(db_path)
@@ -65,46 +58,7 @@ def create_app() -> Flask:
         raise RuntimeError("SECRET_KEY is required outside development.")
 
     app.config["SECRET_KEY"] = secret_key or "dev-secret-key"
-    app.config["DATABASE_PATH"] = os.getenv("DATABASE_PATH", "instance/speak_in_canto.db")
-    app.config["MAX_INPUT_CHARS"] = int(os.getenv("MAX_INPUT_CHARS", "12000"))
-    app.config["TEMP_AUDIO_DIR"] = os.getenv("TEMP_AUDIO_DIR", "static/temp_audio")
-    app.config["TEMP_AUDIO_TTL_HOURS"] = int(os.getenv("TEMP_AUDIO_TTL_HOURS", "4"))
-    app.config["MAX_TEMP_AUDIO_FILES"] = int(os.getenv("MAX_TEMP_AUDIO_FILES", "120"))
-    app.config["MAX_TEMP_AUDIO_BYTES"] = int(os.getenv("MAX_TEMP_AUDIO_BYTES", str(300 * 1024 * 1024)))
-    app.config["TTS_TIMEOUT_SECONDS"] = float(os.getenv("TTS_TIMEOUT_SECONDS", "20"))
-    app.config["HQ_TEXT_TARGET_MAX_BYTES"] = int(os.getenv("HQ_TEXT_TARGET_MAX_BYTES", "350"))
-    app.config["HQ_TEXT_HARD_MAX_BYTES"] = int(os.getenv("HQ_TEXT_HARD_MAX_BYTES", "700"))
-    app.config["HQ_MAX_SPLIT_DEPTH"] = int(os.getenv("HQ_MAX_SPLIT_DEPTH", "8"))
-    app.config["HQ_MAX_TTS_CALLS"] = int(os.getenv("HQ_MAX_TTS_CALLS", "128"))
-    app.config["GROK_API_KEY"] = os.getenv("GROK_API_KEY", "")
-    app.config["GROK_MODEL"] = os.getenv("GROK_MODEL", "grok-4-1-fast-non-reasoning")
-    app.config["GROK_BASE_URL"] = os.getenv("GROK_BASE_URL", "https://api.x.ai/v1")
-    app.config["TRANSLATION_TIMEOUT_SECONDS"] = float(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "20"))
-    app.config["MAX_TRANSLATION_INPUT_CHARS"] = int(os.getenv("MAX_TRANSLATION_INPUT_CHARS", "12000"))
-    app.config["MONTHLY_QUOTA_CHARS"] = int(os.getenv("MONTHLY_QUOTA_CHARS", "1000000"))
-    app.config["SESSION_LIFETIME_HOURS"] = int(os.getenv("SESSION_LIFETIME_HOURS", "12"))
-    app.config["REMEMBER_COOKIE_DAYS"] = int(os.getenv("REMEMBER_COOKIE_DAYS", "30"))
-    app.config["SESSION_REFRESH_EACH_REQUEST"] = _env_bool("SESSION_REFRESH_EACH_REQUEST", True)
-    app.config["COOKIE_SECURE"] = _env_bool("COOKIE_SECURE", flask_env != "development")
-    app.config["COOKIE_SAMESITE"] = os.getenv("COOKIE_SAMESITE", "Lax")
-    app.config["DICTIONARY_ENABLED"] = _env_bool("DICTIONARY_ENABLED", True)
-    app.config["DICTIONARY_CC_CEDICT_PATH"] = os.getenv(
-        "DICTIONARY_CC_CEDICT_PATH", "data/dictionaries/cc-cedict.u8"
-    )
-    app.config["DICTIONARY_CC_CANTO_PATH"] = os.getenv(
-        "DICTIONARY_CC_CANTO_PATH", "data/dictionaries/cc-canto.u8"
-    )
-    app.config["MAX_DICTIONARY_INPUT_CHARS"] = int(os.getenv("MAX_DICTIONARY_INPUT_CHARS", "12000"))
-    app.config["MAX_DICTIONARY_ALTERNATIVES"] = int(os.getenv("MAX_DICTIONARY_ALTERNATIVES", "3"))
-    app.config["MAX_DICTIONARY_TERM_CHARS"] = int(os.getenv("MAX_DICTIONARY_TERM_CHARS", "64"))
-    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=app.config["SESSION_LIFETIME_HOURS"])
-    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=app.config["REMEMBER_COOKIE_DAYS"])
-    app.config["SESSION_COOKIE_HTTPONLY"] = True
-    app.config["REMEMBER_COOKIE_HTTPONLY"] = True
-    app.config["SESSION_COOKIE_SECURE"] = bool(app.config["COOKIE_SECURE"])
-    app.config["REMEMBER_COOKIE_SECURE"] = bool(app.config["COOKIE_SECURE"])
-    app.config["SESSION_COOKIE_SAMESITE"] = app.config["COOKIE_SAMESITE"]
-    app.config["REMEMBER_COOKIE_SAMESITE"] = app.config["COOKIE_SAMESITE"]
+    apply_runtime_config(app.config, flask_env=flask_env)
 
     sqlite_path = _build_sqlite_path(app)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_path}"
@@ -124,25 +78,21 @@ def create_app() -> Flask:
     @app.route("/")
     @login_required
     def index():
-        voice_catalog = GoogleTTSWrapper.get_voice_catalog()
-        return render_template(
-            "reader.html",
-            user=current_user,
-            voice_catalog=voice_catalog,
-            max_input_chars=app.config["MAX_INPUT_CHARS"],
-            max_translation_input_chars=app.config["MAX_TRANSLATION_INPUT_CHARS"],
-        )
+        return _render_reader(app)
 
     @app.route("/reader")
     @login_required
     def reader():
+        return _render_reader(app)
+
+    def _render_reader(flask_app: Flask):
         voice_catalog = GoogleTTSWrapper.get_voice_catalog()
         return render_template(
             "reader.html",
             user=current_user,
             voice_catalog=voice_catalog,
-            max_input_chars=app.config["MAX_INPUT_CHARS"],
-            max_translation_input_chars=app.config["MAX_TRANSLATION_INPUT_CHARS"],
+            max_input_chars=flask_app.config["MAX_INPUT_CHARS"],
+            max_translation_input_chars=flask_app.config["MAX_TRANSLATION_INPUT_CHARS"],
         )
 
     @app.route("/healthz")

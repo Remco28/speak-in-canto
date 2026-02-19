@@ -6,6 +6,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from models import log_usage
+from services.audio_policy import cleanup_audio_store
 from services.audio_store import AudioStore
 from services.ssml_builder import SSMLBuilder
 from services.tts_google import GoogleTTSWrapper, TTSServiceError
@@ -53,11 +54,7 @@ def synthesize():
         return jsonify({"error": "Unsupported voice_name"}), 400
 
     store = AudioStore(current_app.config.get("TEMP_AUDIO_DIR", "static/temp_audio"))
-    store.cleanup(
-        ttl_hours=int(current_app.config.get("TEMP_AUDIO_TTL_HOURS", 4)),
-        max_files=int(current_app.config.get("MAX_TEMP_AUDIO_FILES", 120)),
-        max_bytes=int(current_app.config.get("MAX_TEMP_AUDIO_BYTES", 300 * 1024 * 1024)),
-    )
+    cleanup_audio_store(current_app, store)
 
     tokens = builder.build_tokens(normalized)
 
@@ -85,11 +82,7 @@ def synthesize():
 
     merged_audio = b"".join(synthesis["audio_chunks"])
     stored = store.save_audio(merged_audio)
-    store.cleanup(
-        ttl_hours=int(current_app.config.get("TEMP_AUDIO_TTL_HOURS", 4)),
-        max_files=int(current_app.config.get("MAX_TEMP_AUDIO_FILES", 120)),
-        max_bytes=int(current_app.config.get("MAX_TEMP_AUDIO_BYTES", 300 * 1024 * 1024)),
-    )
+    cleanup_audio_store(current_app, store)
 
     non_whitespace_count = sum(1 for token in tokens if not token.char.isspace())
     log_usage(current_user.id, non_whitespace_count, voice_name=voice_name)
