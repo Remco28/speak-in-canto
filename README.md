@@ -57,6 +57,38 @@ set -a; source .env; set +a; .venv/bin/flask run
 .venv/bin/flask create-admin --username <admin> --password '<strong-password>'
 ```
 
+## User Management
+- There is no public sign-up flow. Users are created by an existing admin or with the CLI.
+- Passwords are stored as hashes in the SQLite database, so use the supported commands instead of editing raw password values.
+
+Create the first admin:
+```bash
+set -a; source .env; set +a
+.venv/bin/flask create-admin --username <admin> --password '<strong-password>'
+```
+
+Change an existing user's username and password:
+```bash
+set -a; source .env; set +a
+.venv/bin/flask update-user --username <current-username> --new-username <new-username> --password '<new-strong-password>'
+```
+
+You can change only one field by omitting the other option:
+```bash
+.venv/bin/flask update-user --username <current-username> --new-username <new-username>
+.venv/bin/flask update-user --username <current-username> --password '<new-strong-password>'
+```
+
+Manage additional users in the admin UI:
+- Log in at `/login` with an admin account.
+- Open `/admin/dashboard`.
+- Use `Create User` to add a standard user or another admin.
+- Use `Delete` to remove users.
+
+Current limitation:
+- The admin UI can create and delete users, but it does not edit an existing user's role or credentials.
+- If you need to replace the initial admin safely, create a second admin first, confirm it works, then delete the old account.
+
 ## Deployment (Coolify)
 Use the full deployment guide:
 - `docs/DEPLOY_COOLIFY.md`

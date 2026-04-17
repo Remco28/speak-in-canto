@@ -103,6 +103,45 @@ class AuthAndCoreTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Username already exists.", response.data)
 
+    def test_update_user_cli_changes_username_and_password(self) -> None:
+        runner = self.app.test_cli_runner()
+        result = runner.invoke(
+            args=[
+                "update-user",
+                "--username",
+                "admin",
+                "--new-username",
+                "primary-admin",
+                "--password",
+                "freshadminpass123",
+            ]
+        )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("User 'admin' updated.", result.output)
+
+        with self.app.app_context():
+            user = User.query.filter_by(username="primary-admin").first()
+            self.assertIsNotNone(user)
+            assert user is not None
+            self.assertTrue(check_password_hash(user.password_hash, "freshadminpass123"))
+            self.assertIsNone(User.query.filter_by(username="admin").first())
+
+    def test_update_user_cli_rejects_duplicate_username(self) -> None:
+        runner = self.app.test_cli_runner()
+        result = runner.invoke(
+            args=[
+                "update-user",
+                "--username",
+                "admin",
+                "--new-username",
+                "user",
+            ]
+        )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("User 'user' already exists.", result.output)
+
     def test_log_usage_inserts_row(self) -> None:
         with self.app.app_context():
             user = User.query.filter_by(username="user").first()

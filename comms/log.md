@@ -35,3 +35,5 @@
 [2026-02-18 19:24] [CLAUDE]: REFACTOR DONE: Removed dead frontend hooks and unused templates, extracted shared backend helpers (`services/usage_metrics.py`, `services/runtime_config.py`, `services/audio_policy.py`), and consolidated duplicated route logic without API behavior changes.
 [2026-02-18 19:24] [CLAUDE]: REFACTOR DONE: Modularized reader frontend into ES modules (`sync`, `voice`, `dictionary`, `translation`) with `static/js/reader.js` as orchestrator; switched reader template script loading to `type=module`.
 [2026-02-18 19:24] [CLAUDE]: REFACTOR DONE: Normalized test naming from task-era files to feature-oriented files, removed empty archive directory, refreshed architecture/environment/manifest docs, and re-validated full suite passing (44 tests).
+[2026-04-17 13:01] [CLAUDE]: IMPL IN_PROGRESS: Adding a supported CLI workflow to update existing usernames/passwords and documenting admin user management in the repo README.
+[2026-04-17 13:01] [CLAUDE]: IMPL DONE: Added `flask update-user` for username/password changes, expanded README user-management instructions, and validated the auth/core test suite.

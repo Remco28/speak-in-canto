@@ -121,6 +121,39 @@ def create_app() -> Flask:
             db.session.commit()
             click.echo(f"Admin user '{username}' created.")
 
+    @app.cli.command("update-user")
+    @click.option("--username", required=True, help="Existing username")
+    @click.option("--new-username", help="New username")
+    @click.option("--password", help="New password")
+    def update_user(username: str, new_username: str | None, password: str | None) -> None:
+        if new_username is None and password is None:
+            raise click.ClickException("Provide --new-username and/or --password.")
+
+        if password is not None and len(password) < 8:
+            raise click.ClickException("Password must be at least 8 characters.")
+
+        with app.app_context():
+            db.create_all()
+            user = User.query.filter_by(username=username).first()
+            if user is None:
+                raise click.ClickException(f"User '{username}' not found.")
+
+            if new_username is not None:
+                candidate = new_username.strip()
+                if not candidate:
+                    raise click.ClickException("New username cannot be blank.")
+
+                existing = User.query.filter_by(username=candidate).first()
+                if existing is not None and existing.id != user.id:
+                    raise click.ClickException(f"User '{candidate}' already exists.")
+                user.username = candidate
+
+            if password is not None:
+                user.password_hash = generate_password_hash(password)
+
+            db.session.commit()
+            click.echo(f"User '{username}' updated.")
+
     with app.app_context():
         db.create_all()
         _enable_sqlite_pragmas(app)
