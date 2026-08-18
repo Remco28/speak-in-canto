@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from flask import Blueprint, current_app, jsonify, request
-from flask_login import current_user, login_required
 
-from models import log_usage
 from services.audio_policy import cleanup_audio_store
 from services.audio_store import AudioStore
 from services.ssml_builder import SSMLBuilder
@@ -23,7 +21,6 @@ class HQSynthesisContext:
 
 
 @tts_bp.route("/synthesize", methods=["POST"])
-@login_required
 def synthesize():
     payload = request.get_json(silent=True) or {}
     text = str(payload.get("text") or "")
@@ -83,9 +80,6 @@ def synthesize():
     merged_audio = b"".join(synthesis["audio_chunks"])
     stored = store.save_audio(merged_audio)
     cleanup_audio_store(current_app, store)
-
-    non_whitespace_count = sum(1 for token in tokens if not token.char.isspace())
-    log_usage(current_user.id, non_whitespace_count, voice_name=voice_name)
 
     if voice_mode == "high_quality":
         current_app.logger.info(

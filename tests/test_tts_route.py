@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 import os
-import tempfile
 import unittest
 from unittest.mock import patch
 
-from werkzeug.security import generate_password_hash
-
 from app import create_app
-from models import UsageLog, User, db
 
 
 class FakeStore:
@@ -34,42 +30,12 @@ class FakeTTSValid:
 
 class TTSRouteTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
-        os.close(self.db_fd)
-
         os.environ["FLASK_ENV"] = "development"
-        os.environ["SECRET_KEY"] = "test-secret"
-        os.environ["DATABASE_PATH"] = self.db_path
         os.environ["MAX_INPUT_CHARS"] = "20"
 
         self.app = create_app()
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()
-
-        with self.app.app_context():
-            db.drop_all()
-            db.create_all()
-            user = User(
-                username="user",
-                password_hash=generate_password_hash("userpass123"),
-                is_admin=False,
-            )
-            db.session.add(user)
-            db.session.commit()
-
-        self.client.post(
-            "/login",
-            data={"username": "user", "password": "userpass123"},
-            follow_redirects=True,
-        )
-
-    def tearDown(self) -> None:
-        with self.app.app_context():
-            db.session.remove()
-            db.drop_all()
-
-        if os.path.exists(self.db_path):
-            os.unlink(self.db_path)
 
     @patch("routes_tts.AudioStore", FakeStore)
     @patch("routes_tts.GoogleTTSWrapper", FakeTTSValid)
@@ -102,24 +68,16 @@ class TTSRouteTests(unittest.TestCase):
             "duration_seconds": 0.1,
         },
     )
-    def test_usage_log_only_on_success(self):
-        ok = self.client.post(
+    def test_success_returns_audio_and_metadata(self):
+        response = self.client.post(
             "/api/tts/synthesize",
             json={"text": "你好", "voice_name": "yue-HK-Standard-A", "speaking_rate": 1.0},
         )
-        self.assertEqual(ok.status_code, 200)
-
-        with self.app.app_context():
-            self.assertEqual(UsageLog.query.count(), 1)
-
-        fail = self.client.post(
-            "/api/tts/synthesize",
-            json={"text": "你好", "voice_name": "invalid", "speaking_rate": 1.0},
-        )
-        self.assertEqual(fail.status_code, 400)
-
-        with self.app.app_context():
-            self.assertEqual(UsageLog.query.count(), 1)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["audio_url"], "/static/temp_audio/fake.mp3")
+        self.assertEqual(data["sync_mode"], "full")
+        self.assertTrue(data["sync_supported"])
 
 
 if __name__ == "__main__":

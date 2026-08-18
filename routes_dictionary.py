@@ -5,7 +5,6 @@ from html import escape
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
-from flask_login import login_required
 
 from services.audio_policy import cleanup_audio_store
 from services.audio_store import AudioStore
@@ -22,7 +21,6 @@ class DictionaryUnavailableError(Exception):
 
 
 @dictionary_bp.route("/lookup", methods=["POST"])
-@login_required
 def lookup():
     if not bool(current_app.config.get("DICTIONARY_ENABLED", True)):
         return jsonify({"error": "Dictionary mode is disabled."}), 503
@@ -60,7 +58,6 @@ def lookup():
 
 
 @dictionary_bp.route("/speak", methods=["POST"])
-@login_required
 def speak():
     payload = request.get_json(silent=True) or {}
     text = str(payload.get("text") or "").strip()

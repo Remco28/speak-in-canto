@@ -1,0 +1,2 @@
+-r requirements.txt
+pywebview[gtk]==6.2.1

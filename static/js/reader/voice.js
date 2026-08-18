@@ -1,3 +1,5 @@
+const PIN_STORAGE_KEY = "canto-reader.voice-pins";
+
 export function createVoiceController({
   voiceCatalog,
   voiceDropdownBtn,
@@ -27,6 +29,24 @@ export function createVoiceController({
     return labelForVoice(found);
   }
 
+  function readPins() {
+    try {
+      const raw = window.localStorage.getItem(PIN_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : []);
+    } catch (_err) {
+      return new Set();
+    }
+  }
+
+  function writePins(pins) {
+    try {
+      window.localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify([...pins]));
+    } catch (_err) {
+      // Non-fatal (e.g. storage disabled).
+    }
+  }
+
   function sortedOptionsWithPins(options) {
     const pinned = [];
     const unpinned = [];
@@ -44,21 +64,11 @@ export function createVoiceController({
     voiceDropdownBtn.textContent = found ? labelForVoice(found) : "Select voice";
   }
 
-  async function togglePin(voiceId, voiceMode) {
-    try {
-      const response = await fetch("/api/user/voice-pins/toggle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voice_id: voiceId, voice_mode: voiceMode }),
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (data.pinned) voicePins.add(voiceId);
-      else voicePins.delete(voiceId);
-      renderVoiceMenu();
-    } catch (_err) {
-      // Non-fatal.
-    }
+  function togglePin(voiceId) {
+    if (voicePins.has(voiceId)) voicePins.delete(voiceId);
+    else voicePins.add(voiceId);
+    writePins(voicePins);
+    renderVoiceMenu();
   }
 
   function renderVoiceMenu() {
@@ -86,9 +96,9 @@ export function createVoiceController({
       pinBtn.className = "pin-btn";
       pinBtn.textContent = "★";
       if (voicePins.has(id)) pinBtn.classList.add("pinned");
-      pinBtn.addEventListener("click", async (event) => {
+      pinBtn.addEventListener("click", (event) => {
         event.stopPropagation();
-        await togglePin(id, currentVoiceMode);
+        togglePin(id);
       });
 
       row.appendChild(selectBtn);
@@ -105,15 +115,8 @@ export function createVoiceController({
     voiceDropdownMenu.hidden = false;
   }
 
-  async function loadPins() {
-    try {
-      const response = await fetch("/api/user/voice-pins");
-      if (!response.ok) return;
-      const data = await response.json();
-      voicePins = new Set((data.pins || []).map((pin) => pin.voice_id));
-    } catch (_err) {
-      // Non-fatal.
-    }
+  function loadPins() {
+    voicePins = readPins();
   }
 
   function applyVoiceMode(mode) {
@@ -165,7 +168,7 @@ export function createVoiceController({
   }
 
   async function init() {
-    await loadPins();
+    loadPins();
     applyVoiceMode("standard");
   }
 

@@ -96,15 +96,6 @@
         <p id="translation-error" class="error" hidden></p>
         <div id="translation-output" class="translation-output" aria-live="polite"></div>
       </section>
-
-      <footer class="footer-links">
-        {% if user.is_admin %}
-          <a href="{{ url_for('admin.dashboard') }}">Admin</a>
-        {% endif %}
-        <form method="post" action="{{ url_for('auth.logout') }}">
-          <button type="submit" class="text-link">Log out</button>
-        </form>
-      </footer>
     </main>
 
     <script>

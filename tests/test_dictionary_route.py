@@ -6,10 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from werkzeug.security import generate_password_hash
-
 from app import create_app
-from models import User, db
 
 
 class FakeDictionaryTTS:
@@ -33,9 +30,6 @@ class FakeDictionaryTTS:
 
 class DictionaryRouteTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
-        os.close(self.db_fd)
-
         self.tmp_dir = tempfile.TemporaryDirectory()
         base = Path(self.tmp_dir.name)
         self.cedict_path = base / "cc-cedict.u8"
@@ -51,8 +45,6 @@ class DictionaryRouteTests(unittest.TestCase):
         )
 
         os.environ["FLASK_ENV"] = "development"
-        os.environ["SECRET_KEY"] = "test-secret"
-        os.environ["DATABASE_PATH"] = self.db_path
         os.environ["DICTIONARY_ENABLED"] = "true"
         os.environ["DICTIONARY_CC_CEDICT_PATH"] = str(self.cedict_path)
         os.environ["DICTIONARY_CC_CANTO_PATH"] = str(self.canto_path)
@@ -66,31 +58,7 @@ class DictionaryRouteTests(unittest.TestCase):
         FakeDictionaryTTS.standard_calls = 0
         FakeDictionaryTTS.high_quality_calls = 0
 
-        with self.app.app_context():
-            db.drop_all()
-            db.create_all()
-            user = User(
-                username="user",
-                password_hash=generate_password_hash("userpass123"),
-                is_admin=False,
-            )
-            db.session.add(user)
-            db.session.commit()
-
-        self.client.post(
-            "/login",
-            data={"username": "user", "password": "userpass123"},
-            follow_redirects=True,
-        )
-
     def tearDown(self) -> None:
-        with self.app.app_context():
-            db.session.remove()
-            db.drop_all()
-
-        if os.path.exists(self.db_path):
-            os.unlink(self.db_path)
-
         self.tmp_dir.cleanup()
 
     def test_lookup_success(self):

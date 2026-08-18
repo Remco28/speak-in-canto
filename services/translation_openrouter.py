@@ -21,12 +21,12 @@ class TranslationResult:
     model: str
 
 
-class GrokTranslationService:
+class OpenRouterTranslationService:
     def __init__(
         self,
         api_key: str,
-        model: str = "grok-4-1-fast-non-reasoning",
-        base_url: str = "https://api.x.ai/v1",
+        model: str = "openrouter/free",
+        base_url: str = "https://openrouter.ai/api/v1",
         timeout_seconds: float = 20.0,
     ) -> None:
         self.api_key = api_key.strip()
@@ -36,7 +36,7 @@ class GrokTranslationService:
 
     def translate_to_english(self, text: str) -> TranslationResult:
         if not self.api_key:
-            raise TranslationServiceError("GROK_API_KEY is not configured.")
+            raise TranslationServiceError("OPENROUTER_API_KEY is not configured.")
 
         payload = {
             "model": self.model,
@@ -56,7 +56,7 @@ class GrokTranslationService:
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "speak-in-canto/1.0",
+                "User-Agent": "canto-reader/1.0",
                 "Authorization": f"Bearer {self.api_key}",
             },
             method="POST",
@@ -91,7 +91,7 @@ class GrokTranslationService:
         if not translation:
             raise TranslationServiceError("Translation response was empty.")
 
-        return TranslationResult(translation=translation, provider="grok", model=self.model)
+        return TranslationResult(translation=translation, provider="openrouter", model=self.model)
 
 
 def _extract_translation(payload: dict) -> str:

@@ -3,16 +3,18 @@ from __future__ import annotations
 import time
 
 from flask import Blueprint, current_app, jsonify, request
-from flask_login import login_required
 
-from services.translation_grok import GrokTranslationService, TranslationServiceError, TranslationTimeoutError
+from services.translation_openrouter import (
+    OpenRouterTranslationService,
+    TranslationServiceError,
+    TranslationTimeoutError,
+)
 
 
 translate_bp = Blueprint("translate", __name__, url_prefix="/api")
 
 
 @translate_bp.route("/translate", methods=["POST"])
-@login_required
 def translate():
     payload = request.get_json(silent=True) or {}
     text = str(payload.get("text") or "")
@@ -24,10 +26,10 @@ def translate():
     if len(normalized) > max_chars:
         return jsonify({"error": f"Input exceeds max length ({max_chars})."}), 413
 
-    service = GrokTranslationService(
-        api_key=str(current_app.config.get("GROK_API_KEY", "")),
-        model=str(current_app.config.get("GROK_MODEL", "grok-4-1-fast-non-reasoning")),
-        base_url=str(current_app.config.get("GROK_BASE_URL", "https://api.x.ai/v1")),
+    service = OpenRouterTranslationService(
+        api_key=str(current_app.config.get("OPENROUTER_API_KEY", "")),
+        model=str(current_app.config.get("OPENROUTER_MODEL", "openrouter/free")),
+        base_url=str(current_app.config.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")),
         timeout_seconds=float(current_app.config.get("TRANSLATION_TIMEOUT_SECONDS", 20.0)),
     )
 
