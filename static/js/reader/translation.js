@@ -46,6 +46,7 @@ export function createTranslationController({
     }
 
     setTranslationLoading(true);
+    let model = "";
     try {
       const response = await fetch("/api/translate", {
         method: "POST",
@@ -58,10 +59,15 @@ export function createTranslationController({
         return;
       }
       setTranslationOutput(data.translation || "");
+      model = data.model || "";
     } catch (_err) {
       setTranslationError("Network or server error.");
     } finally {
       setTranslationLoading(false);
+    }
+    if (translationStatus && model) {
+      translationStatus.hidden = false;
+      translationStatus.textContent = `via ${model}`;
     }
   }
 
@@ -69,7 +75,14 @@ export function createTranslationController({
     if (translateBtn) translateBtn.addEventListener("click", translateToEnglish);
   }
 
+  function clear() {
+    setTranslationOutput("");
+    setTranslationError("");
+    setTranslationLoading(false);
+  }
+
   return {
     bind,
+    clear,
   };
 }

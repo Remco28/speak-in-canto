@@ -39,17 +39,21 @@ class GoogleTTSWrapper:
         self._client: texttospeech.TextToSpeechClient | None = None
 
     @classmethod
+    def get_standard_voice_catalog(cls) -> list[dict[str, str]]:
+        return [{"id": name, "label": name.replace("yue-HK-", "")} for name in sorted(cls.STANDARD_VOICES)]
+
+    @classmethod
     def get_voice_catalog(cls) -> dict[str, list[dict[str, str]]]:
         now = time()
         if cls._voice_catalog_cache and (now - cls._voice_catalog_cache_at) < cls._VOICE_CACHE_TTL_SECONDS:
             return cls._voice_catalog_cache
 
-        standard = [{"id": name, "label": name.replace("yue-HK-", "")} for name in sorted(cls.STANDARD_VOICES)]
         high_quality: list[dict[str, str]] = []
 
         try:
-            client = cls()._get_client()
-            voices = client.list_voices(language_code="yue-HK").voices
+            wrapper = cls()
+            client = wrapper._get_client()
+            voices = client.list_voices(language_code="yue-HK", timeout=wrapper.timeout_seconds).voices
             for voice in voices:
                 name = voice.name
                 if not name.startswith("yue-HK-Chirp3-HD-"):
@@ -60,7 +64,7 @@ class GoogleTTSWrapper:
             high_quality = []
 
         high_quality = sorted(high_quality, key=lambda item: item["label"])
-        cls._voice_catalog_cache = {"standard": standard, "high_quality": high_quality}
+        cls._voice_catalog_cache = {"standard": cls.get_standard_voice_catalog(), "high_quality": high_quality}
         cls._voice_catalog_cache_at = now
         return cls._voice_catalog_cache
 

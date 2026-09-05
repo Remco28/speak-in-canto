@@ -18,16 +18,16 @@ Before shipping dictionary data in production, maintain:
 - CC-CEDICT project wiki: https://cc-cedict.org/wiki/
 - CC-Canto project site: https://cantonese.org/
 
-## Attribution Record (Fill Before Release)
-- CC-CEDICT source URL:
-- CC-CEDICT retrieved date:
-- CC-CEDICT version/snapshot:
-- CC-CEDICT license:
+## Attribution Record
+- CC-CEDICT source URL: https://www.mdbg.net/chinese/dictionary?page=cc-cedict
+- CC-CEDICT retrieved date: 2026-08-18
+- CC-CEDICT version/snapshot: latest release 2026-08-18 (124,871 entries)
+- CC-CEDICT license: Creative Commons Attribution-ShareAlike 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
 
-- CC-Canto source URL:
-- CC-Canto retrieved date:
-- CC-Canto version/snapshot:
-- CC-Canto license:
+- CC-Canto source URL: https://cantonese.org/download.html
+- CC-Canto retrieved date: 2026-08-18
+- CC-Canto version/snapshot: 2017-02-02
+- CC-Canto license: Creative Commons Attribution-ShareAlike 3.0 (https://creativecommons.org/licenses/by-sa/3.0/)
 
 ## Repository Policy
 - Do not add third-party dictionary files without validating license terms.

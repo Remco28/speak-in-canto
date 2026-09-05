@@ -9,6 +9,24 @@ import { createVoiceController } from "./reader/voice.js";
   const maxTranslationInputChars = Number(config.maxTranslationInputChars || 12000);
   const voiceCatalog = config.voices || { standard: [], high_quality: [] };
 
+  const SPEED_STORAGE_KEY = "canto-reader.speed";
+  const TEXT_STORAGE_KEY = "canto-reader.text";
+
+  function readLocal(key, fallback) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw === null ? fallback : raw;
+    } catch (_err) {
+      return fallback;
+    }
+  }
+
+  function writeLocal(key, value) {
+    try {
+      window.localStorage.setItem(key, String(value));
+    } catch (_err) {}
+  }
+
   const textInput = document.getElementById("text-input");
   const charCounter = document.getElementById("char-counter");
   const speedDecreaseBtn = document.getElementById("speed-decrease-btn");
@@ -25,6 +43,9 @@ import { createVoiceController } from "./reader/voice.js";
   const voiceDropdownBtn = document.getElementById("voice-dropdown-btn");
   const voiceDropdownMenu = document.getElementById("voice-dropdown-menu");
   const downloadBtn = document.getElementById("download-btn");
+  const clearBtn = document.getElementById("clear-btn");
+
+  audio.preservesPitch = true;
 
   const translationController = createTranslationController({
     translateBtn: document.getElementById("translate-btn"),
@@ -131,6 +152,7 @@ import { createVoiceController } from "./reader/voice.js";
     audio.playbackRate = currentSpeed;
     if (speedDecreaseBtn) speedDecreaseBtn.disabled = currentSpeed <= SPEED_MIN;
     if (speedIncreaseBtn) speedIncreaseBtn.disabled = currentSpeed >= SPEED_MAX;
+    writeLocal(SPEED_STORAGE_KEY, currentSpeed);
   }
 
   function applyReaderMode(mode) {
@@ -250,7 +272,10 @@ import { createVoiceController } from "./reader/voice.js";
     }
   }
 
-  textInput.addEventListener("input", updateCounter);
+  textInput.addEventListener("input", () => {
+    updateCounter();
+    writeLocal(TEXT_STORAGE_KEY, textInput.value);
+  });
 
   if (speedDecreaseBtn) {
     speedDecreaseBtn.addEventListener("click", () => setSpeed(currentSpeed - SPEED_STEP));
@@ -261,6 +286,22 @@ import { createVoiceController } from "./reader/voice.js";
 
   readBtn.addEventListener("click", synthesize);
   translationController.bind();
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      textInput.value = "";
+      updateCounter();
+      writeLocal(TEXT_STORAGE_KEY, "");
+      currentRenderedText = "";
+      syncController.renderTokens([], {}, () => {});
+      dictionaryController.clearView();
+      setDownloadState("", "");
+      setError("");
+      translationController.clear();
+      audio.pause();
+      audio.removeAttribute("src");
+    });
+  }
 
   audio.addEventListener("play", () => syncController.startSyncLoop());
   audio.addEventListener("pause", () => syncController.stopSyncLoop());
@@ -288,12 +329,31 @@ import { createVoiceController } from "./reader/voice.js";
     dictionaryController.handleResize();
   });
 
+  async function loadVoiceCatalog() {
+    try {
+      const response = await fetch("/api/voices");
+      if (!response.ok) return;
+      const data = await response.json();
+      voiceCatalog.standard = data.standard || [];
+      voiceCatalog.high_quality = data.high_quality || [];
+      voiceController.refresh();
+    } catch (_err) {
+      // Keep the offline standard catalog.
+    }
+  }
+
   (async function init() {
+    const savedText = readLocal(TEXT_STORAGE_KEY, "");
+    if (savedText) textInput.value = savedText;
     updateCounter();
-    setSpeed(1.0);
+
+    const savedSpeed = Number(readLocal(SPEED_STORAGE_KEY, "1.0"));
+    setSpeed(Number.isFinite(savedSpeed) ? savedSpeed : 1.0);
+
     setDownloadState("", "");
     await voiceController.init();
     applyVoiceUi(voiceController.getCurrentVoiceMode());
     applyReaderMode("read");
+    loadVoiceCatalog();
   })();
 })();

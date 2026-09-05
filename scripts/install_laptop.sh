@@ -14,7 +14,7 @@ cd "$PROJECT_ROOT"
 
 APP_NAME="Canto Reader"
 DESKTOP_FILE="${HOME}/.local/share/applications/canto-reader.desktop"
-ICON_PATH="${PROJECT_ROOT}/assets/canto-reader.svg"
+ICON_PATH="${PROJECT_ROOT}/assets/canto-reader.png"
 LAUNCHER_PATH="${PROJECT_ROOT}/scripts/canto-reader.sh"
 
 log() { printf '\033[1;36m==> \033[0m%s\n' "$*"; }

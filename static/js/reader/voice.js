@@ -1,4 +1,5 @@
 const PIN_STORAGE_KEY = "canto-reader.voice-pins";
+const SELECTION_STORAGE_KEY = "canto-reader.voice-selection";
 
 export function createVoiceController({
   voiceCatalog,
@@ -47,6 +48,34 @@ export function createVoiceController({
     }
   }
 
+  function readSelection() {
+    try {
+      const raw = window.localStorage.getItem(SELECTION_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (
+        parsed &&
+        (parsed.mode === "standard" || parsed.mode === "high_quality") &&
+        typeof parsed.voiceId === "string"
+      ) {
+        return parsed;
+      }
+    } catch (_err) {
+      // Fall through.
+    }
+    return null;
+  }
+
+  function writeSelection() {
+    try {
+      window.localStorage.setItem(
+        SELECTION_STORAGE_KEY,
+        JSON.stringify({ mode: currentVoiceMode, voiceId: selectedVoiceId })
+      );
+    } catch (_err) {
+      // Non-fatal.
+    }
+  }
+
   function sortedOptionsWithPins(options) {
     const pinned = [];
     const unpinned = [];
@@ -89,6 +118,7 @@ export function createVoiceController({
         updateVoiceButtonLabel();
         renderVoiceMenu();
         closeVoiceMenu();
+        writeSelection();
       });
 
       const pinBtn = document.createElement("button");
@@ -131,6 +161,7 @@ export function createVoiceController({
     }
 
     currentVoiceMode = mode;
+    if (voiceModeToggle) voiceModeToggle.checked = mode === "high_quality";
     const options = getModeOptions(mode);
     if (!options || options.length === 0) {
       selectedVoiceId = "";
@@ -144,12 +175,29 @@ export function createVoiceController({
     if (onModeChange) onModeChange(currentVoiceMode);
   }
 
+  function restoreVoiceId(voiceId) {
+    const options = getModeOptions(currentVoiceMode);
+    const exists = options.some((voice) => (typeof voice === "string" ? voice : voice.id) === voiceId);
+    if (!exists) return;
+    selectedVoiceId = voiceId;
+    updateVoiceButtonLabel();
+    renderVoiceMenu();
+  }
+
+  function applySavedSelection() {
+    const saved = readSelection();
+    const targetMode = saved && saved.mode === "high_quality" ? "high_quality" : "standard";
+    applyVoiceMode(targetMode);
+    if (saved && saved.voiceId) restoreVoiceId(saved.voiceId);
+  }
+
   function bind({ onModeChangeHandler }) {
     onModeChange = onModeChangeHandler || null;
 
     if (voiceModeToggle) {
       voiceModeToggle.addEventListener("change", () => {
         applyVoiceMode(voiceModeToggle.checked ? "high_quality" : "standard");
+        writeSelection();
       });
     }
 
@@ -169,12 +217,17 @@ export function createVoiceController({
 
   async function init() {
     loadPins();
-    applyVoiceMode("standard");
+    applySavedSelection();
+  }
+
+  function refresh() {
+    applySavedSelection();
   }
 
   return {
     bind,
     init,
+    refresh,
     handleDocumentClick,
     getCurrentVoiceMode: () => currentVoiceMode,
     getSelectedVoiceId: () => selectedVoiceId,

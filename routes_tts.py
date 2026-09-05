@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from flask import Blueprint, current_app, jsonify, request
 
-from services.audio_policy import cleanup_audio_store
+from services.audio_policy import cleanup_audio_store, resolve_temp_audio_dir
 from services.audio_store import AudioStore
 from services.ssml_builder import SSMLBuilder
 from services.tts_google import GoogleTTSWrapper, TTSServiceError
@@ -50,7 +50,7 @@ def synthesize():
     if not tts.validate_voice(voice_name, voice_mode):
         return jsonify({"error": "Unsupported voice_name"}), 400
 
-    store = AudioStore(current_app.config.get("TEMP_AUDIO_DIR", "static/temp_audio"))
+    store = AudioStore(resolve_temp_audio_dir(current_app))
     cleanup_audio_store(current_app, store)
 
     tokens = builder.build_tokens(normalized)

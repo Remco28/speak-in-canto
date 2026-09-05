@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import socket
+import sys
 import threading
 import time
 import urllib.request
@@ -15,10 +17,20 @@ from waitress import serve
 
 from app import app
 
+
+def _env_port() -> int:
+    try:
+        return int(os.getenv("PORT", "8734"))
+    except ValueError:
+        return 8734
+
+
 HOST = "127.0.0.1"
-PORT = int(os.getenv("PORT", "8734"))
+PORT = _env_port()
 URL = f"http://{HOST}:{PORT}"
-ICON_PATH = str(Path(__file__).resolve().parent / "assets" / "canto-reader.svg")
+PROJECT_ROOT = Path(__file__).resolve().parent
+ICON_PATH = str(PROJECT_ROOT / "assets" / "canto-reader.png")
+STORAGE_PATH = str(PROJECT_ROOT / "instance" / "webview_profile")
 
 
 def _wait_until_ready(timeout_seconds: float = 20.0) -> None:
@@ -35,7 +47,17 @@ def _wait_until_ready(timeout_seconds: float = 20.0) -> None:
     raise RuntimeError(f"Canto Reader server did not become ready: {last_error}")
 
 
+def _port_in_use(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.5)
+        return sock.connect_ex((host, port)) == 0
+
+
 def main() -> None:
+    if _port_in_use(HOST, PORT):
+        print(f"Canto Reader is already running on {URL}.", file=sys.stderr)
+        return
+
     # pywebview's GTK backend disables file downloads unless explicitly enabled.
     webview.settings["ALLOW_DOWNLOADS"] = True
 
@@ -49,8 +71,11 @@ def main() -> None:
 
     _wait_until_ready()
 
+    # Persist localStorage (voice pins/selection) across launches.
+    Path(STORAGE_PATH).mkdir(parents=True, exist_ok=True)
+
     webview.create_window("Canto Reader", URL, width=1100, height=800)
-    webview.start(icon=ICON_PATH)
+    webview.start(icon=ICON_PATH, private_mode=False, storage_path=STORAGE_PATH)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest.mock import patch
 
 from app import create_app
 
@@ -33,6 +34,16 @@ class AppRouteTests(unittest.TestCase):
     def test_legacy_auth_routes_are_gone(self):
         self.assertEqual(self.client.get("/login").status_code, 404)
         self.assertEqual(self.client.get("/admin/dashboard").status_code, 404)
+
+    @patch("app.GoogleTTSWrapper.get_voice_catalog")
+    def test_voices_api_returns_catalog(self, get_catalog):
+        get_catalog.return_value = {
+            "standard": [{"id": "yue-HK-Standard-A", "label": "Standard-A"}],
+            "high_quality": [],
+        }
+        response = self.client.get("/api/voices")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("standard", response.get_json())
 
 
 if __name__ == "__main__":

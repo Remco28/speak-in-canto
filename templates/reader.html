@@ -21,7 +21,10 @@
         <textarea id="text-input" rows="10" placeholder="Paste Cantonese text..."></textarea>
         <div class="meta-row">
           <p id="char-counter">0 / {{ max_input_chars }} characters</p>
-          <p id="sync-mode-note" class="muted" hidden></p>
+          <div class="meta-actions">
+            <button id="clear-btn" type="button" class="button-secondary">Clear</button>
+            <p id="sync-mode-note" class="muted" hidden></p>
+          </div>
         </div>
 
         <div class="control-grid">
@@ -52,7 +55,7 @@
               <span id="speed-label" class="speed-value">1.0x</span>
               <button id="speed-increase-btn" type="button" class="button-secondary speed-btn" aria-label="Increase speed">+</button>
             </div>
-            <p id="speed-note" class="muted" hidden>High Quality speed changes may slightly affect voice quality.</p>
+            <p id="speed-note" class="muted" hidden>Speed is applied during playback.</p>
           </div>
         </div>
 
