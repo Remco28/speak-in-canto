@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash
 
 from app import create_app
 from models import User, db
-from services.translation_grok import TranslationServiceError, TranslationTimeoutError
+from services.translation_openrouter import TranslationServiceError, TranslationTimeoutError
 
 
 class FakeTranslatorSuccess:
@@ -20,7 +20,7 @@ class FakeTranslatorSuccess:
         return type(
             "Result",
             (),
-            {"translation": "Hello world.", "provider": "grok", "model": "grok-4-1-fast-non-reasoning"},
+            {"translation": "Hello world.", "provider": "openrouter", "model": "minimax/minimax-m3:free"},
         )()
 
 
@@ -79,13 +79,13 @@ class TranslationRouteTests(unittest.TestCase):
         if os.path.exists(self.db_path):
             os.unlink(self.db_path)
 
-    @patch("routes_translate.GrokTranslationService", FakeTranslatorSuccess)
+    @patch("routes_translate.OpenRouterTranslationService", FakeTranslatorSuccess)
     def test_translate_success(self):
         response = self.client.post("/api/translate", json={"text": "你好"})
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data["translation"], "Hello world.")
-        self.assertEqual(data["provider"], "grok")
+        self.assertEqual(data["provider"], "openrouter")
 
     def test_translate_rejects_empty(self):
         response = self.client.post("/api/translate", json={"text": "    "})
@@ -95,12 +95,12 @@ class TranslationRouteTests(unittest.TestCase):
         response = self.client.post("/api/translate", json={"text": "你" * 30})
         self.assertEqual(response.status_code, 413)
 
-    @patch("routes_translate.GrokTranslationService", FakeTranslatorTimeout)
+    @patch("routes_translate.OpenRouterTranslationService", FakeTranslatorTimeout)
     def test_translate_timeout_maps_504(self):
         response = self.client.post("/api/translate", json={"text": "你好"})
         self.assertEqual(response.status_code, 504)
 
-    @patch("routes_translate.GrokTranslationService", FakeTranslatorError)
+    @patch("routes_translate.OpenRouterTranslationService", FakeTranslatorError)
     def test_translate_provider_error_maps_502(self):
         response = self.client.post("/api/translate", json={"text": "你好"})
         self.assertEqual(response.status_code, 502)

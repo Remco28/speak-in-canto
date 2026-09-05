@@ -1,7 +1,7 @@
 # System Architecture: Canto Reader
 
 ## 1. Overview
-A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playback, character-level sync (Standard voices), local dictionary lookup, and optional English translation via Grok.
+A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playback, character-level sync (Standard voices), local dictionary lookup, and optional English translation via OpenRouter.
 
 ## 2. Tech Stack
 - **Language:** Python 3.x
@@ -11,7 +11,7 @@ A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playbac
 - **TTS Engine:** Google Cloud Text-to-Speech
   - Standard yue-HK voices with SSML marks + sync
   - Chirp3-HD yue-HK voices in high-quality mode (no SSML mark sync)
-- **Translation Engine:** Grok API (English translation for reader text)
+- **Translation Engine:** OpenRouter API using `minimax/minimax-m3:free` (English translation for reader text)
 - **Dictionary Engine:** Local dictionary ingestion + phrase-first lookup (CC-CEDICT + CC-Canto)
 
 ## 3. Data Model (SQLite)
@@ -73,7 +73,7 @@ A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playbac
 
 ## 8. Deployment (Coolify/VPS)
 - **Google Credentials:** Either mounted key file path via `GOOGLE_APPLICATION_CREDENTIALS`, or inline JSON via `GCP_SERVICE_ACCOUNT_JSON`.
-- **Additional Secrets:** Grok API key stored in environment (`GROK_API_KEY`).
+- **Additional Secrets:** OpenRouter API key stored in environment (`OPENROUTER_API_KEY`).
 - **Persistence:** SQLite database file must be mapped to a persistent volume.
 - **HTTPS:** Managed by Coolify via Let's Encrypt.
 - **Runtime:** Gunicorn in container (`Dockerfile`), with low-memory defaults configurable via env.
@@ -81,7 +81,7 @@ A lightweight Cantonese TTS reader with authentication, Google Cloud TTS playbac
 ## 9. Translation Integration
 - **Route:** `POST /api/translate` (auth required).
 - **Purpose:** Translate reader input text to English for comprehension support.
-- **Flow:** Reader UI -> Flask translate route -> Grok API -> JSON translation response -> render below reader.
+- **Flow:** Reader UI -> Flask translate route -> OpenRouter API -> JSON translation response -> render below reader.
 - **Guardrails:** Input length cap + upstream timeout + controlled error responses.
 
 ## 10. Refactor Kickoff (2026-02-18)

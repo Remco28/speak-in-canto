@@ -29,10 +29,12 @@ Use one of these methods:
 - `GCP_SERVICE_ACCOUNT_JSON={...single-line-json...}`
 - Keep `private_key` newline escapes as `\\n`.
 
-### Grok Translation
-- `GROK_API_KEY=...`
-- `GROK_MODEL=grok-4-1-fast-non-reasoning`
-- `GROK_BASE_URL=https://api.x.ai/v1`
+### OpenRouter Translation
+- `OPENROUTER_API_KEY=...`
+- `OPENROUTER_MODEL=minimax/minimax-m3:free`
+- `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`
+- `OPENROUTER_SITE_URL=` (optional)
+- `OPENROUTER_APP_NAME=Speak in Canto` (optional)
 - `TRANSLATION_TIMEOUT_SECONDS=20`
 - `MAX_TRANSLATION_INPUT_CHARS=12000`
 
@@ -80,5 +82,5 @@ Dictionary source files are intentionally ignored by Git and must be provided by
 
 ## Notes
 - Audio files are temporary and written to `/app/static/temp_audio`, then cleaned up by TTL/cap logic.
-- If translation fails with `403/1010`, verify `GROK_API_KEY` in Coolify and redeploy so env changes are applied.
+- If translation fails, verify `OPENROUTER_API_KEY` and the selected model in Coolify, then redeploy so env changes are applied.
 - High Quality TTS may fail on provider sentence-length limits if text is effectively one long sentence. Keep HQ guardrail defaults (`HQ_TEXT_TARGET_MAX_BYTES`, `HQ_TEXT_HARD_MAX_BYTES`, `HQ_MAX_SPLIT_DEPTH`, `HQ_MAX_TTS_CALLS`) unless you have measured reasons to tune them.

@@ -55,10 +55,12 @@ Use one method:
 
 These prevent provider sentence-length failures from causing unbounded retry fan-out.
 
-## Translation (Grok)
-- `GROK_API_KEY`
-- `GROK_MODEL` (default `grok-4-1-fast-non-reasoning`)
-- `GROK_BASE_URL` (default `https://api.x.ai/v1`)
+## Translation (OpenRouter)
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL` (default `minimax/minimax-m3:free`)
+- `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`)
+- `OPENROUTER_SITE_URL` (optional `HTTP-Referer` attribution header)
+- `OPENROUTER_APP_NAME` (optional `X-OpenRouter-Title` attribution header)
 - `TRANSLATION_TIMEOUT_SECONDS` (default `20`)
 - `MAX_TRANSLATION_INPUT_CHARS` (default `12000`)
 
@@ -85,9 +87,11 @@ COOKIE_SAMESITE=Lax
 GUNICORN_WORKERS=1
 GUNICORN_THREADS=2
 GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/gcp-sa.json
-GROK_API_KEY=
-GROK_MODEL=grok-4-1-fast-non-reasoning
-GROK_BASE_URL=https://api.x.ai/v1
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=minimax/minimax-m3:free
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_SITE_URL=
+OPENROUTER_APP_NAME=Speak in Canto
 MAX_INPUT_CHARS=12000
 TEMP_AUDIO_DIR=static/temp_audio
 MAX_TRANSLATION_INPUT_CHARS=12000

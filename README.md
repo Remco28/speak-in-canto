@@ -4,7 +4,7 @@ Cantonese reading app with:
 - Google Cloud Text-to-Speech playback
 - Character-level sync highlighting in Standard voice mode
 - High Quality voice mode (no sync)
-- English translation via Grok
+- English translation via OpenRouter
 - Local dictionary lookup mode (phrase-first, no AI)
 - Dictionary popup + click-to-speak with cached term audio
 - Auth + admin usage dashboard
@@ -26,7 +26,7 @@ Cantonese reading app with:
 - Flask + Flask-Login + Flask-SQLAlchemy
 - SQLite
 - Google Cloud Text-to-Speech
-- Grok API
+- OpenRouter API
 - Gunicorn (container runtime)
 
 ## Frontend Structure

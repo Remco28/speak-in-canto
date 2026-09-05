@@ -21,22 +21,26 @@ class TranslationResult:
     model: str
 
 
-class GrokTranslationService:
+class OpenRouterTranslationService:
     def __init__(
         self,
         api_key: str,
-        model: str = "grok-4-1-fast-non-reasoning",
-        base_url: str = "https://api.x.ai/v1",
+        model: str = "minimax/minimax-m3:free",
+        base_url: str = "https://openrouter.ai/api/v1",
+        site_url: str = "",
+        app_name: str = "Speak in Canto",
         timeout_seconds: float = 20.0,
     ) -> None:
         self.api_key = api_key.strip()
         self.model = model
         self.base_url = base_url.rstrip("/")
+        self.site_url = site_url.strip()
+        self.app_name = app_name.strip()
         self.timeout_seconds = timeout_seconds
 
     def translate_to_english(self, text: str) -> TranslationResult:
         if not self.api_key:
-            raise TranslationServiceError("GROK_API_KEY is not configured.")
+            raise TranslationServiceError("OPENROUTER_API_KEY is not configured.")
 
         payload = {
             "model": self.model,
@@ -50,15 +54,21 @@ class GrokTranslationService:
             "temperature": 0.2,
         }
 
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "speak-in-canto/1.0",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        if self.site_url:
+            headers["HTTP-Referer"] = self.site_url
+        if self.app_name:
+            headers["X-OpenRouter-Title"] = self.app_name
+
         req = request.Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "speak-in-canto/1.0",
-                "Authorization": f"Bearer {self.api_key}",
-            },
+            headers=headers,
             method="POST",
         )
 
@@ -73,11 +83,7 @@ class GrokTranslationService:
                 detail = detail_body[:300]
             except Exception:
                 detail = str(exc)
-            if exc.code == 403 and "1010" in detail:
-                raise TranslationServiceError(
-                    "Forbidden by upstream edge (403/1010). Check API key permissions/team access and network egress."
-                ) from exc
-            raise TranslationServiceError(f"Upstream error {exc.code}: {detail}") from exc
+            raise TranslationServiceError(f"OpenRouter error {exc.code}: {detail}") from exc
         except (socket.timeout, TimeoutError) as exc:
             raise TranslationTimeoutError("Translation request timed out.") from exc
         except error.URLError as exc:
@@ -91,7 +97,7 @@ class GrokTranslationService:
         if not translation:
             raise TranslationServiceError("Translation response was empty.")
 
-        return TranslationResult(translation=translation, provider="grok", model=self.model)
+        return TranslationResult(translation=translation, provider="openrouter", model=self.model)
 
 
 def _extract_translation(payload: dict) -> str:
