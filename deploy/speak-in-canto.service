@@ -1,6 +1,6 @@
 [Unit]
 Description=Canto Reader
-Documentation=file:///home/frank/speak-in-canto/README.md
+Documentation=file:///home/frank/Projects/speak-in-canto/README.md
 Wants=network-online.target
 After=network-online.target tailscaled.service
 
@@ -8,13 +8,13 @@ After=network-online.target tailscaled.service
 Type=simple
 User=frank
 Group=frank
-WorkingDirectory=/home/frank/speak-in-canto
-EnvironmentFile=-/home/frank/speak-in-canto/.env
+WorkingDirectory=/home/frank/Projects/speak-in-canto
+EnvironmentFile=-/home/frank/Projects/speak-in-canto/.env
 Environment=PYTHONUNBUFFERED=1
-Environment=PATH=/home/frank/speak-in-canto/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PATH=/home/frank/Projects/speak-in-canto/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=GUNICORN_WORKERS=1
 Environment=GUNICORN_THREADS=2
-ExecStart=/home/frank/speak-in-canto/.venv/bin/gunicorn -w 1 -k gthread --threads 2 --bind 127.0.0.1:8927 app:app
+ExecStart=/home/frank/Projects/speak-in-canto/.venv/bin/gunicorn -w 1 -k gthread --threads 2 --bind 127.0.0.1:8927 app:app
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
