@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 from flask import Blueprint, current_app, jsonify, request
 
-from services.audio_policy import cleanup_audio_store, resolve_temp_audio_dir
+from services.audio_policy import (
+    audio_url_prefix,
+    cleanup_audio_store,
+    resolve_temp_audio_dir,
+)
 from services.audio_store import AudioStore
 from services.ssml_builder import SSMLBuilder
 from services.tts_google import GoogleTTSWrapper, TTSServiceError
@@ -17,6 +22,7 @@ tts_bp = Blueprint("tts", __name__, url_prefix="/api/tts")
 class HQSynthesisContext:
     total_calls: int = 0
     split_retries: int = 0
+    transient_retries: int = 0
     max_depth_seen: int = 0
 
 
@@ -50,7 +56,9 @@ def synthesize():
     if not tts.validate_voice(voice_name, voice_mode):
         return jsonify({"error": "Unsupported voice_name"}), 400
 
-    store = AudioStore(resolve_temp_audio_dir(current_app))
+    store = _audio_store_for_request()
+    if store is None:
+        return jsonify({"error": "Server audio storage is misconfigured."}), 500
     cleanup_audio_store(current_app, store)
 
     tokens = builder.build_tokens(normalized)
@@ -66,6 +74,11 @@ def synthesize():
                 hard_max_bytes=int(current_app.config.get("HQ_TEXT_HARD_MAX_BYTES", 700)),
                 max_split_depth=int(current_app.config.get("HQ_MAX_SPLIT_DEPTH", 8)),
                 max_tts_calls=int(current_app.config.get("HQ_MAX_TTS_CALLS", 128)),
+                max_synthesis_seconds=float(current_app.config.get("HQ_MAX_SYNTHESIS_SECONDS", 90.0)),
+                max_transient_retries=int(current_app.config.get("HQ_MAX_TRANSIENT_RETRIES", 2)),
+                transient_backoff_seconds=float(
+                    current_app.config.get("HQ_TRANSIENT_BACKOFF_SECONDS", 1.0)
+                ),
             )
         else:
             synthesis = _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate)
@@ -83,10 +96,11 @@ def synthesize():
 
     if voice_mode == "high_quality":
         current_app.logger.info(
-            "HQ TTS metrics: init_chunks=%s total_calls=%s split_retries=%s max_depth=%s",
+            "HQ TTS metrics: init_chunks=%s total_calls=%s split_retries=%s transient_retries=%s max_depth=%s",
             synthesis.get("hq_initial_chunks", 0),
             synthesis.get("hq_total_calls", 0),
             synthesis.get("hq_split_retries", 0),
+            synthesis.get("hq_transient_retries", 0),
             synthesis.get("hq_max_depth", 0),
         )
 
@@ -175,6 +189,16 @@ def _synthesize_with_fallback(builder, tts, tokens, voice_name, speaking_rate):
     }
 
 
+def _audio_store_for_request() -> AudioStore | None:
+    try:
+        directory = resolve_temp_audio_dir(current_app)
+        prefix = audio_url_prefix(current_app)
+    except ValueError as exc:
+        current_app.logger.error("Invalid TEMP_AUDIO_DIR: %s", exc)
+        return None
+    return AudioStore(directory, url_prefix=prefix)
+
+
 def _synthesize_high_quality(
     builder,
     tts,
@@ -184,8 +208,12 @@ def _synthesize_high_quality(
     hard_max_bytes=700,
     max_split_depth=8,
     max_tts_calls=128,
+    max_synthesis_seconds=90.0,
+    max_transient_retries=2,
+    transient_backoff_seconds=1.0,
 ):
     chunks = builder.build_text_chunks(tokens, target_max_bytes=target_max_bytes, hard_max_bytes=hard_max_bytes)
+    start_mono = time.monotonic()
     all_audio: list[bytes] = []
     context = HQSynthesisContext()
     for chunk_text in chunks:
@@ -197,6 +225,11 @@ def _synthesize_high_quality(
             depth=0,
             max_split_depth=max_split_depth,
             max_tts_calls=max_tts_calls,
+            start_mono=start_mono,
+            max_synthesis_seconds=max_synthesis_seconds,
+            transient_attempt=0,
+            max_transient_retries=max_transient_retries,
+            transient_backoff_seconds=transient_backoff_seconds,
         )
         all_audio.extend(chunk_audio)
 
@@ -210,6 +243,7 @@ def _synthesize_high_quality(
         "hq_initial_chunks": len(chunks),
         "hq_total_calls": context.total_calls,
         "hq_split_retries": context.split_retries,
+        "hq_transient_retries": context.transient_retries,
         "hq_max_depth": context.max_depth_seen,
     }
 
@@ -222,7 +256,16 @@ def _synthesize_high_quality_chunk_with_retry(
     depth: int,
     max_split_depth: int,
     max_tts_calls: int,
+    start_mono: float | None = None,
+    max_synthesis_seconds: float = 90.0,
+    transient_attempt: int = 0,
+    max_transient_retries: int = 2,
+    transient_backoff_seconds: float = 1.0,
 ) -> list[bytes]:
+    if start_mono is None:
+        start_mono = time.monotonic()
+    if (time.monotonic() - start_mono) >= max_synthesis_seconds:
+        raise TTSServiceError("High Quality synthesis exceeded time budget. Please shorten input.")
     if context.total_calls >= max_tts_calls:
         raise TTSServiceError("High Quality synthesis exceeded retry call budget. Please shorten input.")
     if depth > max_split_depth:
@@ -234,41 +277,135 @@ def _synthesize_high_quality_chunk_with_retry(
         chunk = tts.synthesize_text(chunk_text, voice_name)
         return [chunk.audio_content]
     except TTSServiceError as exc:
-        if not _is_sentence_too_long_error(exc):
-            raise
+        if _is_sentence_too_long_error(exc):
+            split_index = _find_text_split_index(chunk_text)
+            if split_index is None:
+                raise
 
-        split_index = _find_text_split_index(chunk_text)
-        if split_index is None:
-            raise
+            left = chunk_text[:split_index].strip()
+            right = chunk_text[split_index:].strip()
+            if not left or not right:
+                raise
 
-        left = chunk_text[:split_index].strip()
-        right = chunk_text[split_index:].strip()
-        if not left or not right:
-            raise
+            context.split_retries += 1
+            return _synthesize_high_quality_chunk_with_retry(
+                tts,
+                left,
+                voice_name,
+                context=context,
+                depth=depth + 1,
+                max_split_depth=max_split_depth,
+                max_tts_calls=max_tts_calls,
+                start_mono=start_mono,
+                max_synthesis_seconds=max_synthesis_seconds,
+                transient_attempt=0,
+                max_transient_retries=max_transient_retries,
+                transient_backoff_seconds=transient_backoff_seconds,
+            ) + _synthesize_high_quality_chunk_with_retry(
+                tts,
+                right,
+                voice_name,
+                context=context,
+                depth=depth + 1,
+                max_split_depth=max_split_depth,
+                max_tts_calls=max_tts_calls,
+                start_mono=start_mono,
+                max_synthesis_seconds=max_synthesis_seconds,
+                transient_attempt=0,
+                max_transient_retries=max_transient_retries,
+                transient_backoff_seconds=transient_backoff_seconds,
+            )
 
-        context.split_retries += 1
-        return _synthesize_high_quality_chunk_with_retry(
-            tts,
-            left,
-            voice_name,
-            context=context,
-            depth=depth + 1,
-            max_split_depth=max_split_depth,
-            max_tts_calls=max_tts_calls,
-        ) + _synthesize_high_quality_chunk_with_retry(
-            tts,
-            right,
-            voice_name,
-            context=context,
-            depth=depth + 1,
-            max_split_depth=max_split_depth,
-            max_tts_calls=max_tts_calls,
-        )
+        if transient_attempt < max_transient_retries and _is_transient_error(exc):
+            context.transient_retries += 1
+            delay = transient_backoff_seconds * (2**transient_attempt)
+            remaining = max_synthesis_seconds - (time.monotonic() - start_mono)
+            if remaining <= 0:
+                raise TTSServiceError(
+                    "High Quality synthesis exceeded time budget. Please shorten input."
+                ) from exc
+            time.sleep(min(delay, remaining))
+            return _synthesize_high_quality_chunk_with_retry(
+                tts,
+                chunk_text,
+                voice_name,
+                context=context,
+                depth=depth,
+                max_split_depth=max_split_depth,
+                max_tts_calls=max_tts_calls,
+                start_mono=start_mono,
+                max_synthesis_seconds=max_synthesis_seconds,
+                transient_attempt=transient_attempt + 1,
+                max_transient_retries=max_transient_retries,
+                transient_backoff_seconds=transient_backoff_seconds,
+            )
+        raise
+
+
+_LENGTH_ERROR_HINTS = (
+    "sentences that are too long",
+    "sentence too long",
+    "sentence is too long",
+    "text too long",
+    "text is too long",
+    "input too long",
+    "input is too long",
+    "too long",
+    "too large",
+    "exceeds the maximum",
+    "exceeds maximum",
+    "maximum allowed length",
+    "maximum length",
+    "max length",
+)
 
 
 def _is_sentence_too_long_error(exc: Exception) -> bool:
     msg = str(exc).lower()
-    return "sentences that are too long" in msg
+    if any(hint in msg for hint in _LENGTH_ERROR_HINTS):
+        return True
+    # Generic provider phrasing such as "exceeds 500 characters": length-like
+    # words near "exceed", but never quota errors.
+    if "exceed" in msg and "quota" not in msg:
+        if any(word in msg for word in ("character", "length", "sentence", "text", "input", "utterance")):
+            return True
+    return False
+
+
+_TRANSIENT_ERROR_HINTS = (
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
+    "too many requests",
+    "rate limit",
+    "rate-limit",
+    "temporarily",
+    "temporary failure",
+    "try again",
+    "timeout",
+    "timed out",
+    "deadline exceeded",
+    "unavailable",
+    "service unavailable",
+    "internal error",
+    "backend error",
+    "connection reset",
+    "connection aborted",
+    "connection refused",
+    "broken pipe",
+    "overloaded",
+)
+
+
+def _is_transient_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(hint in msg for hint in _TRANSIENT_ERROR_HINTS)
+
+
+_HQ_STRONG_BREAKS = "。！？!?\n…"
+_HQ_WEAK_BREAKS = "，,；;：:、 \t「」『』（）()〈〉《》【】—·-"
 
 
 def _find_text_split_index(text: str) -> int | None:
@@ -276,18 +413,35 @@ def _find_text_split_index(text: str) -> int | None:
         return None
 
     midpoint = len(text) // 2
-    preferred_breaks = "。！？!?，,；;：:\n "
     window = max(1, min(60, len(text) // 3))
 
-    for offset in range(window + 1):
-        right = midpoint + offset
-        if right < len(text) and text[right] in preferred_breaks:
-            return right + 1
-        left = midpoint - offset
-        if left > 0 and text[left] in preferred_breaks:
-            return left + 1
+    # Prefer strong sentence boundaries first so fallback splits are less
+    # likely to cut Cantonese text mid-clause, then fall back to clause breaks.
+    for breaks in (_HQ_STRONG_BREAKS, _HQ_WEAK_BREAKS):
+        for offset in range(window + 1):
+            right = midpoint + offset
+            if right < len(text) and text[right] in breaks:
+                return right + 1
+            left = midpoint - offset
+            if left > 0 and text[left] in breaks:
+                return left + 1
 
-    return midpoint
+    index = midpoint
+    # Avoid cutting inside an ASCII letter/digit run (e.g. "OpenRouter").
+    steps = 0
+    while (
+        steps < window
+        and 0 < index < len(text)
+        and text[index - 1].isascii()
+        and text[index - 1].isalnum()
+        and text[index].isascii()
+        and text[index].isalnum()
+    ):
+        index += 1
+        steps += 1
+    if index >= len(text):
+        return midpoint
+    return index
 
 
 def _inject_end_mark(ssml: str, mark_name: str) -> str:

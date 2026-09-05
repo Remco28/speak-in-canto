@@ -106,12 +106,26 @@ Setup guide:
 ## Important Operational Notes
 - High Quality voice mode uses provider text synthesis without SSML marks, so
   sync highlighting is intentionally disabled.
+- Standard voice validation is fully local (no Google `list_voices` call);
+  only High Quality voice discovery uses the remote catalog with graceful
+  degradation to Standard voices when Google is unreachable.
 - Google HQ TTS can reject long sentences. The backend proactively chunks HQ
   text and has bounded recursive split retries using:
   - `HQ_TEXT_TARGET_MAX_BYTES`
   - `HQ_TEXT_HARD_MAX_BYTES`
   - `HQ_MAX_SPLIT_DEPTH`
   - `HQ_MAX_TTS_CALLS`
+  - `HQ_MAX_SYNTHESIS_SECONDS` (total per-request time budget; controlled
+    `502` instead of occupying a Waitress thread for many minutes)
+  - `HQ_MAX_TRANSIENT_RETRIES` / `HQ_TRANSIENT_BACKOFF_SECONDS` (bounded
+    same-chunk retries for transient 429/5xx/timeout errors; every attempt
+    counts against the call and time budgets)
+- Translation retries transient OpenRouter failures only
+  (`OPENROUTER_MAX_RETRIES` / `OPENROUTER_RETRY_BACKOFF_SECONDS`); auth and
+  validation errors never retry.
+- `TEMP_AUDIO_DIR` must stay inside the app `static/` folder (default
+  `static/temp_audio`) so returned audio URLs remain servable; other values
+  are rejected with a clear error instead of a URL that would 404.
 - Keep these defaults unless you have measured evidence to change them.
 
 ## Testing

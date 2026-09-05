@@ -7,7 +7,13 @@ from pathlib import Path
 
 from services.audio_store import AudioStore
 from services.ssml_builder import SSMLBuilder
-from routes_tts import _synthesize_high_quality, _synthesize_with_fallback
+from routes_tts import (
+    _find_text_split_index,
+    _is_sentence_too_long_error,
+    _is_transient_error,
+    _synthesize_high_quality,
+    _synthesize_with_fallback,
+)
 from services.tts_google import TTSServiceError
 
 
@@ -248,6 +254,172 @@ class TTSServicesTests(unittest.TestCase):
         self.assertGreater(len(chunks), 1)
         for chunk in chunks:
             self.assertLessEqual(len(chunk.encode("utf-8")), 700)
+
+    def test_high_quality_time_budget_zero_raises_controlled_error(self):
+        class FakeHQTTS:
+            def synthesize_text(self, text, _voice_name):
+                return type("Chunk", (), {"audio_content": b"A", "timepoints": []})()
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("你好世界")
+        with self.assertRaises(TTSServiceError) as ctx:
+            _synthesize_high_quality(
+                builder,
+                FakeHQTTS(),
+                tokens,
+                "yue-HK-Chirp3-HD-Orus",
+                max_synthesis_seconds=0,
+            )
+        self.assertIn("time budget", str(ctx.exception).lower())
+
+    def test_high_quality_success_under_generous_time_budget(self):
+        class FakeHQTTS:
+            def __init__(self):
+                self.calls = 0
+
+            def synthesize_text(self, text, _voice_name):
+                self.calls += 1
+                return type("Chunk", (), {"audio_content": b"A", "timepoints": []})()
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("你好世界")
+        fake = FakeHQTTS()
+        result = _synthesize_high_quality(
+            builder, fake, tokens, "yue-HK-Chirp3-HD-Orus", max_synthesis_seconds=90.0
+        )
+        self.assertEqual(len(result["audio_chunks"]), fake.calls)
+        self.assertGreaterEqual(fake.calls, 1)
+
+    def test_length_error_variants_trigger_split_retry(self):
+        for message in (
+            "400 This request contains sentences that are too long.",
+            "400 text is too long.",
+            "400 input too long.",
+            "Request exceeds 500 characters.",
+            "Maximum length exceeded.",
+            "HTTP 400: response too large.",
+        ):
+            self.assertTrue(
+                _is_sentence_too_long_error(TTSServiceError(message)),
+                f"expected length error for: {message}",
+            )
+
+        for message in (
+            "503 Service Unavailable.",
+            "429 Too Many Requests.",
+            "Quota exceeded for quota metric.",
+            "Unsupported high quality voice",
+            "Something else went wrong.",
+        ):
+            self.assertFalse(
+                _is_sentence_too_long_error(TTSServiceError(message)),
+                f"must not classify as length error: {message}",
+            )
+
+    def test_length_error_variant_end_to_end_splits(self):
+        class FakeHQTTS:
+            def synthesize_text(self, text, _voice_name):
+                if len(text) > 50:
+                    raise TTSServiceError("400 text is too long.")
+                return type("Chunk", (), {"audio_content": b"A", "timepoints": []})()
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("據" * 120)
+        result = _synthesize_high_quality(builder, FakeHQTTS(), tokens, "yue-HK-Chirp3-HD-Orus")
+        self.assertGreater(len(result["audio_chunks"]), 1)
+        self.assertGreaterEqual(result["hq_split_retries"], 1)
+
+    def test_transient_error_never_triggers_split(self):
+        class FakeAlwaysUnavailable:
+            def synthesize_text(self, _text, _voice_name):
+                raise TTSServiceError("503 Service Unavailable.")
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("你好世界")
+        with self.assertRaises(TTSServiceError) as ctx:
+            _synthesize_high_quality(
+                builder,
+                FakeAlwaysUnavailable(),
+                tokens,
+                "yue-HK-Chirp3-HD-Orus",
+                max_transient_retries=0,
+                transient_backoff_seconds=0,
+            )
+        self.assertIn("503", str(ctx.exception))
+
+    def test_transient_retry_then_success(self):
+        class FakeFlaky:
+            def __init__(self):
+                self.calls = 0
+
+            def synthesize_text(self, _text, _voice_name):
+                self.calls += 1
+                if self.calls == 1:
+                    raise TTSServiceError("503 Service Unavailable.")
+                return type("Chunk", (), {"audio_content": b"A", "timepoints": []})()
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("你好世界")
+        fake = FakeFlaky()
+        result = _synthesize_high_quality(
+            builder,
+            fake,
+            tokens,
+            "yue-HK-Chirp3-HD-Orus",
+            max_transient_retries=2,
+            transient_backoff_seconds=0,
+        )
+        self.assertEqual(len(result["audio_chunks"]), 1)
+        self.assertEqual(fake.calls, 2)
+        self.assertEqual(result["hq_transient_retries"], 1)
+        self.assertEqual(result["hq_total_calls"], 2)
+
+    def test_transient_retries_count_against_call_budget(self):
+        class FakeAlwaysUnavailable:
+            def synthesize_text(self, _text, _voice_name):
+                raise TTSServiceError("503 Service Unavailable.")
+
+        builder = SSMLBuilder()
+        tokens = builder.build_tokens("你好世界")
+        with self.assertRaises(TTSServiceError) as ctx:
+            _synthesize_high_quality(
+                builder,
+                FakeAlwaysUnavailable(),
+                tokens,
+                "yue-HK-Chirp3-HD-Orus",
+                max_tts_calls=2,
+                max_transient_retries=5,
+                transient_backoff_seconds=0,
+            )
+        self.assertIn("call budget", str(ctx.exception).lower())
+
+    def test_split_prefers_sentence_boundary_over_clause_break(self):
+        text = "據" * 45 + "。" + "據" * 4 + "，" + "據" * 45
+        index = _find_text_split_index(text)
+        self.assertIsNotNone(index)
+        self.assertTrue(text[:index].endswith("。"))
+
+    def test_split_avoids_cutting_ascii_word(self):
+        text = "據" * 30 + "OpenRouter" + "據" * 30
+        index = _find_text_split_index(text)
+        self.assertIsNotNone(index)
+        self.assertTrue(text[:index].endswith("OpenRouter"))
+        self.assertTrue(text[index:].startswith("據"))
+
+    def test_transient_classifier(self):
+        for message in (
+            "429 Too Many Requests",
+            "503 Service Unavailable",
+            "Request timed out",
+            "Deadline exceeded",
+            "Connection reset by peer",
+        ):
+            self.assertTrue(_is_transient_error(TTSServiceError(message)), message)
+        for message in (
+            "This request contains sentences that are too long.",
+            "Unsupported high quality voice",
+        ):
+            self.assertFalse(_is_transient_error(TTSServiceError(message)), message)
 
 
 if __name__ == "__main__":

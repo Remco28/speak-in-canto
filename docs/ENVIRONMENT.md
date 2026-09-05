@@ -25,6 +25,10 @@ Use one method:
 ## TTS Guardrails
 - `MAX_INPUT_CHARS` (default `12000`)
 - `TEMP_AUDIO_DIR` (default `static/temp_audio`)
+  - Must resolve inside the app `static/` folder so the returned
+    `/static/...` audio URL stays servable. Any other value is rejected with a
+    clear `500` (`Server audio storage is misconfigured.`). Subdirectories of
+    `static/` are allowed and get a matching `/static/...` URL.
 - `TTS_TIMEOUT_SECONDS` (default `20`)
 - `TEMP_AUDIO_TTL_HOURS` (default `4`)
 - `MAX_TEMP_AUDIO_FILES` (default `120`)
@@ -35,6 +39,19 @@ Use one method:
 - `HQ_TEXT_HARD_MAX_BYTES` (default `700`)
 - `HQ_MAX_SPLIT_DEPTH` (default `8`)
 - `HQ_MAX_TTS_CALLS` (default `128`)
+- `HQ_MAX_SYNTHESIS_SECONDS` (default `90`)
+  - Total per-request wall-clock budget for High Quality synthesis (chunking +
+    retries + backoff). Exceeding it returns a controlled `502` instead of
+    occupying a Waitress thread for many minutes. Standard synthesis is
+    unaffected.
+- `HQ_MAX_TRANSIENT_RETRIES` (default `2`)
+  - Bounded same-chunk retries for transient Google errors (429/5xx,
+    timeouts, connection failures). Every attempt counts against
+    `HQ_MAX_TTS_CALLS` and `HQ_MAX_SYNTHESIS_SECONDS`, so total work stays
+    bounded. Length errors split instead of retrying here.
+- `HQ_TRANSIENT_BACKOFF_SECONDS` (default `1`)
+  - Base backoff between transient retries (doubles per attempt, capped by the
+    remaining time budget). Set to `0` in tests for instant retries.
 
 These prevent provider sentence-length failures from causing unbounded retry fan-out.
 
@@ -43,6 +60,13 @@ These prevent provider sentence-length failures from causing unbounded retry fan
 - `OPENROUTER_MODEL` (default `openrouter/free`; change to any OpenRouter slug, e.g. a `:free` Llama/Mistral/Qwen variant or a Grok slug)
 - `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`)
 - `TRANSLATION_TIMEOUT_SECONDS` (default `20`)
+- `OPENROUTER_MAX_RETRIES` (default `1`)
+  - Bounded retries for transient failures only (timeouts, connection errors,
+    `408`/`429`/`5xx`). Auth/validation errors (`400`/`401`/`403`/`404`) and
+    empty responses never retry.
+- `OPENROUTER_RETRY_BACKOFF_SECONDS` (default `1`)
+  - Base backoff between translation retries (doubles per attempt), so total
+    added delay is capped and request time cannot grow unbounded.
 - `MAX_TRANSLATION_INPUT_CHARS` (default `12000`)
 
 ## Dictionary Mode (Local, No-AI)

@@ -94,5 +94,62 @@ class OpenRouterServiceTests(unittest.TestCase):
             service.translate_to_english("hello")
 
 
+class OpenRouterRetryTests(unittest.TestCase):
+    def _http_error(self, code, body=b"busy"):
+        return error.HTTPError(
+            "https://openrouter.ai/api/v1/chat/completions",
+            code,
+            "Upstream",
+            None,
+            io.BytesIO(body),
+        )
+
+    @patch("services.translation_openrouter.time.sleep")
+    @patch("services.translation_openrouter.request.urlopen")
+    def test_transient_503_retries_then_succeeds(self, urlopen, sleep):
+        urlopen.side_effect = [
+            self._http_error(503),
+            _fake_response({"choices": [{"message": {"content": "Hello"}}]}),
+        ]
+        service = OpenRouterTranslationService(
+            api_key="k", max_retries=1, retry_backoff_seconds=0.5
+        )
+        result = service.translate_to_english("你好")
+        self.assertEqual(result.translation, "Hello")
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(0.5)
+
+    @patch("services.translation_openrouter.time.sleep")
+    @patch("services.translation_openrouter.request.urlopen")
+    def test_timeout_retries_with_exponential_backoff(self, urlopen, sleep):
+        urlopen.side_effect = socket.timeout("timed out")
+        service = OpenRouterTranslationService(
+            api_key="k", max_retries=2, retry_backoff_seconds=1.0
+        )
+        with self.assertRaises(TranslationTimeoutError):
+            service.translate_to_english("hello")
+        self.assertEqual(urlopen.call_count, 3)
+        self.assertEqual([c.args[0] for c in sleep.call_args_list], [1.0, 2.0])
+
+    @patch("services.translation_openrouter.time.sleep")
+    @patch("services.translation_openrouter.request.urlopen")
+    def test_non_retryable_400_does_not_retry(self, urlopen, sleep):
+        urlopen.side_effect = self._http_error(400, b"bad request")
+        service = OpenRouterTranslationService(api_key="k", max_retries=2)
+        with self.assertRaises(TranslationServiceError):
+            service.translate_to_english("hello")
+        self.assertEqual(urlopen.call_count, 1)
+        sleep.assert_not_called()
+
+    @patch("services.translation_openrouter.time.sleep")
+    @patch("services.translation_openrouter.request.urlopen")
+    def test_missing_key_never_retries(self, urlopen, sleep):
+        service = OpenRouterTranslationService(api_key="", max_retries=2)
+        with self.assertRaises(TranslationServiceError):
+            service.translate_to_english("hello")
+        urlopen.assert_not_called()
+        sleep.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

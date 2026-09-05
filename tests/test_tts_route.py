@@ -79,6 +79,18 @@ class TTSRouteTests(unittest.TestCase):
         self.assertEqual(data["sync_mode"], "full")
         self.assertTrue(data["sync_supported"])
 
+    @patch("routes_tts.AudioStore", FakeStore)
+    @patch("routes_tts.GoogleTTSWrapper", FakeTTSValid)
+    def test_audio_dir_outside_static_is_rejected(self):
+        # No filesystem access: the path only needs to resolve outside static.
+        self.app.config["TEMP_AUDIO_DIR"] = "/tmp/speak-in-canto-outside-static"
+        response = self.client.post(
+            "/api/tts/synthesize",
+            json={"text": "你好", "voice_name": "yue-HK-Standard-A", "speaking_rate": 1.0},
+        )
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("misconfigured", response.get_json().get("error", "").lower())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,6 +31,8 @@ def translate():
         model=str(current_app.config.get("OPENROUTER_MODEL", "openrouter/free")),
         base_url=str(current_app.config.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")),
         timeout_seconds=float(current_app.config.get("TRANSLATION_TIMEOUT_SECONDS", 20.0)),
+        max_retries=int(current_app.config.get("OPENROUTER_MAX_RETRIES", 1)),
+        retry_backoff_seconds=float(current_app.config.get("OPENROUTER_RETRY_BACKOFF_SECONDS", 1.0)),
     )
 
     started = time.monotonic()

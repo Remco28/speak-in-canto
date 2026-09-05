@@ -15,9 +15,10 @@ class StoredAudio:
 
 
 class AudioStore:
-    def __init__(self, root_dir: str = "static/temp_audio") -> None:
+    def __init__(self, root_dir: str = "static/temp_audio", url_prefix: str = "/static/temp_audio") -> None:
         self.root = Path(root_dir)
         self.root.mkdir(parents=True, exist_ok=True)
+        self.url_prefix = (url_prefix or "/static/temp_audio").rstrip("/") or "/static/temp_audio"
 
     def save_audio(self, content: bytes) -> StoredAudio:
         timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
@@ -94,6 +95,6 @@ class AudioStore:
     def _to_stored_audio(self, filename: str, path: Path) -> StoredAudio:
         return StoredAudio(
             filename=filename,
-            url=f"/static/temp_audio/{filename}",
+            url=f"{self.url_prefix}/{filename}",
             bytes_size=path.stat().st_size,
         )

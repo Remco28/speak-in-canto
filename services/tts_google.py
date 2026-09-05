@@ -69,10 +69,13 @@ class GoogleTTSWrapper:
         return cls._voice_catalog_cache
 
     def validate_voice(self, voice_name: str, voice_mode: str) -> bool:
-        catalog = self.get_voice_catalog()
         if voice_mode == self.MODE_STANDARD:
+            # Known Standard voices are validated locally so validation never
+            # blocks on (or fails with) the remote list_voices API. Dynamic
+            # discovery is reserved for high_quality voices below.
             return voice_name in self.STANDARD_VOICES
         if voice_mode == self.MODE_HIGH_QUALITY:
+            catalog = self.get_voice_catalog()
             return any(voice["id"] == voice_name for voice in catalog["high_quality"])
         return False
 

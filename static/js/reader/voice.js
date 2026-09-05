@@ -153,10 +153,12 @@ export function createVoiceController({
     if (mode === "high_quality" && (!voiceCatalog.high_quality || voiceCatalog.high_quality.length === 0)) {
       currentVoiceMode = "standard";
       if (voiceModeToggle) voiceModeToggle.checked = false;
+      // Notify first: the Standard-mode UI callback clears the sync note, so
+      // the "unavailable" message must be set afterwards to stay visible.
+      if (onModeChange) onModeChange("standard");
       syncModeNote.hidden = false;
       syncModeNote.textContent = "High Quality voices are unavailable in this project.";
       if (speedNote) speedNote.hidden = true;
-      if (onModeChange) onModeChange("standard");
       return;
     }
 

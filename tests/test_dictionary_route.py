@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,7 +51,10 @@ class DictionaryRouteTests(unittest.TestCase):
         os.environ["DICTIONARY_CC_CANTO_PATH"] = str(self.canto_path)
         os.environ["MAX_DICTIONARY_INPUT_CHARS"] = "120"
         os.environ["MAX_DICTIONARY_TERM_CHARS"] = "32"
-        os.environ["TEMP_AUDIO_DIR"] = str(base / "temp_audio")
+        # TEMP_AUDIO_DIR must resolve inside the app static folder so the
+        # returned audio URLs stay servable; keep the scratch dir under the
+        # (gitignored) default temp_audio tree.
+        os.environ["TEMP_AUDIO_DIR"] = "static/temp_audio/test_dict_scratch"
 
         self.app = create_app()
         self.app.config["TESTING"] = True
@@ -59,6 +63,9 @@ class DictionaryRouteTests(unittest.TestCase):
         FakeDictionaryTTS.high_quality_calls = 0
 
     def tearDown(self) -> None:
+        scratch = Path(self.app.root_path) / "static" / "temp_audio" / "test_dict_scratch"
+        shutil.rmtree(scratch, ignore_errors=True)
+        os.environ.pop("TEMP_AUDIO_DIR", None)
         self.tmp_dir.cleanup()
 
     def test_lookup_success(self):
@@ -95,6 +102,7 @@ class DictionaryRouteTests(unittest.TestCase):
         second_data = second.get_json()
         self.assertEqual(second_data["cached"], True)
         self.assertEqual(first_data["audio_url"], second_data["audio_url"])
+        self.assertTrue(first_data["audio_url"].startswith("/static/temp_audio/test_dict_scratch/"))
         self.assertEqual(FakeDictionaryTTS.standard_calls, 1)
 
     @patch("routes_dictionary.GoogleTTSWrapper", FakeDictionaryTTS)
