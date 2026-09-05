@@ -1,24 +1,23 @@
-# Canto Reader — home server systemd unit example.
-#
-# Install to /etc/systemd/system/canto-reader.service, then:
-#   sudo systemctl daemon-reload
-#   sudo systemctl enable --now canto-reader
-#
-# Adjust User, WorkingDirectory, EnvironmentFile, and the listen address/port
-# to match your setup. See docs/DEPLOY_HOME_SERVER.md.
-
 [Unit]
-Description=Canto Reader (Flask + waitress)
-After=network.target
+Description=Canto Reader
+Documentation=file:///home/frank/Projects/speak-in-canto/README.md
+Wants=network-online.target
+After=network-online.target tailscaled.service
 
 [Service]
 Type=simple
-User=canto
-WorkingDirectory=/opt/canto-reader
-EnvironmentFile=/opt/canto-reader/.env
-ExecStart=/opt/canto-reader/.venv/bin/python -m waitress --host=0.0.0.0 --port=8734 --threads=4 app:app
-Restart=always
-RestartSec=3
+User=frank
+Group=frank
+WorkingDirectory=/home/frank/Projects/speak-in-canto
+EnvironmentFile=-/home/frank/Projects/speak-in-canto/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/frank/Projects/speak-in-canto/.venv/bin/python -m waitress --host=127.0.0.1 --port=8927 --threads=4 app:app
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
